@@ -16,7 +16,7 @@ Dieses Dokument enthält Beispielfragen, die mit dem Flight Search Bot System be
 - Wann ist der früheste Flug von Köln nach Madrid?
 - Wann ist der letzte Flug von Wien nach Lissabon?
 - Welcher Flug hat die kürzeste Flugzeit von Amsterdam nach Athen?
-- Wie viele Stunden dauert ein Flug von Berlin nach Tokyo?
+- Wie viele Stunden dauert ein Flug von Berlin nach Tokio?
 
 ## Preise und Tarife
 
