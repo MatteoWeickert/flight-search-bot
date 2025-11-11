@@ -1,0 +1,11 @@
+Zeige Abflüge aus Teterboro
+
+Was ist die durchschnittliche Verspätung von Abflügen aus Teterboro?
+
+Welche Flugzeugtypen nutzt Lufthansa?
+
+Welche Airlines fliegen von oder nach Teterboro?
+
+Welche Airlines nutzen einen Airbus A380?
+
+Schneiden sich die TRajektorien der Flüge mit den IDs 264868001 und 264868002

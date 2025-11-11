@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="initial-scale=1,maximum-scale=1,user-scalable=no" />
+  <title>FlightGPT</title>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;600&display=swap" rel="stylesheet">
+  <script type="module" src="https://js.arcgis.com/calcite-components/3.2.1/calcite.esm.js"></script>
+  <link rel="stylesheet" href="https://js.arcgis.com/4.33/esri/themes/dark/main.css" />
+  <link rel="stylesheet" href="style.css">
+  <script src="https://js.arcgis.com/4.33/"></script>
+  <script type="module" src="https://js.arcgis.com/4.33/map-components/"></script>
+  <script defer src="main.js"></script>
+</head>
+<body>
+  <div class="layout">
+    <div class="map-wrapper">
+
+      <div class="arcgismap">
+        <arcgis-map id="map" basemap="satellite" zoom="6" center="11.5, 48.9"></arcgis-map>
+
+        <aside class="account-panel glass fade-in-down" aria-label="Account Panel">
+          <div class="account-card">
+            <img class="account-avatar" src="pb.jpg" alt="Profilbild" />
+
+            <div class="account-id">
+              <p class="account-username">Max Mustermann</p>
+              <p class="account-name">max_mustermann11</p>
+            </div>
+
+            <div class="account-actions">
+              <button class="account-icon-slot" id="dataBtn" aria-label="Daten">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-table" viewBox="0 0 16 16">
+                  <path d="M0 2a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2zm15 2h-4v3h4zm0 4h-4v3h4zm0 4h-4v3h3a1 1 0 0 0 1-1zm-5 3v-3H6v3zm-5 0v-3H1v2a1 1 0 0 0 1 1zm-4-4h4V8H1zm0-4h4V4H1zm5-3v3h4V4zm4 4H6v3h4z"/>
+                </svg>
+              </button>
+            </div>
+          </div>
+        </aside>
+
+        <aside class="overlay-panel glass slide-in-left">
+          <div class="chat-boundary">
+
+            <div class="chat-header">
+              <div class="chat-header-left">
+                <p>FlightGPT</p>
+              </div>
+              <div class="chat-header-right">
+                <button id="layerPickerBtn" type="button" class="chat-rationale-toggle" title="Layer auswählen" aria-label="Layer auswählen">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="currentColor" class="bi bi-layers" viewBox="0 0 16 16" aria-hidden="true">
+                    <path d="M8.235 1.559a.5.5 0 0 0-.47 0l-7.5 4a.5.5 0 0 0 0 .882L3.188 8 .264 9.559a.5.5 0 0 0 0 .882l7.5 4a.5.5 0 0 0 .47 0l7.5-4a.5.5 0 0 0 0-.882L12.813 8l2.922-1.559a.5.5 0 0 0 0-.882zm3.515 7.008L14.438 10 8 13.433 1.562 10 4.25 8.567l3.515 1.874a.5.5 0 0 0 .47 0zM8 9.433 1.562 6 8 2.567 14.438 6z"/>
+                  </svg>
+                </button>
+              </div>
+            </div>
+
+            <div class="chat-history">            
+              <div class="chat-alerts-wrapper">
+                <div class="chat-alerts" id="chat-alerts">
+                  FlightGPT kann Fehler machen. Überprüfe wichtige Informationen.
+                </div>
+              </div>
+            </div>
+
+            <div id="layerSwitcher" class="layer-switcher glass is-hidden" aria-label="Layer-Auswahl" style="margin:10px 0;">
+              <div class="layer-switcher-list" id="layerSwitcherList"></div>
+            </div>
+
+            <div class="chat-input-boundary">
+              <div id="chatLoading" class="loading-indicator" hidden>
+                <div class="spinner" aria-hidden="true"></div>
+              </div>
+                <div class="chat-input">
+                    <textarea id="chatInput" class="chat-input-field" rows="1" placeholder="Nachricht eingeben…"></textarea>
+                </div>
+              </div>
+              <div class="chat-input-extras">
+                <button id="sendBtn" type="button" class="icon-button" title="Senden" aria-label="Senden">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor" class="bi bi-send" viewBox="0 0 16 16">
+                    <path d="M15.854.146a.5.5 0 0 1 .11.54l-5.819 14.547a.75.75 0 0 1-1.329.124l-3.178-4.995L.643 7.184a.75.75 0 0 1 .124-1.33L15.314.037a.5.5 0 0 1 .54.11ZM6.636 10.07l2.761 4.338L14.13 2.576zm6.787-8.201L1.591 6.602l4.339 2.76z"/>
+                  </svg>
+                </button>
+              </div>
+            </div>
+          </div>
+        </aside>
+      </div>
+    </div>
+  </div>
+</body>
+</html>
