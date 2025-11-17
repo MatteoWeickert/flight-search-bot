@@ -16,8 +16,8 @@ def chat():
     if not msg:
         return jsonify({"error": "message missing"}), 400
     try:
-        reply = answer_question(msg)
-        return jsonify({"reply": reply})
+        reply_obj = answer_question(msg)
+        return jsonify(reply_obj)
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
