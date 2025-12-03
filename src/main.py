@@ -5,6 +5,10 @@ from src.agents.supervisor import process_query
 app = Flask(__name__, static_folder=".", static_url_path="")
 CORS(app, resources={r"/chat": {"origins": "*"}})
 
+@app.route("/")
+def index():
+    return app.send_static_file("index.html")
+
 @app.route("/chat", methods=["POST"])
 def chat():
     data = request.get_json(silent=True) or {}

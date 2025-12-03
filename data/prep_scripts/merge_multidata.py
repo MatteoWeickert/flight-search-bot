@@ -2,20 +2,30 @@ import pandas as pd
 
 # --- KONFIGURATION ---
 # Passen Sie diese Dateipfade bei Bedarf an
-TRAJECTORIES_FILE = r"C:\Users\maweo\OneDrive - Universität Münster\Dokumente\Master\Semester 1\Spatial Information Search\flight-search-bot\trajectories_first_100.csv"
+TRAJECTORIES_FILE = r"C:\Users\maweo\OneDrive - Universität Münster\Dokumente\Master\Semester 1\Spatial Information Search\flight-search-bot\data\trajectories_first_100.csv"
 OUTPUT_FILE = 'trajectories_aggregated.csv'
 
 # Legen Sie hier die exakten Namen der Spalten fest, die Sie benötigen.
 # WICHTIG: Achten Sie genau auf Leerzeichen und Groß-/Kleinschreibung!
-ID_COLUMN = 'ECTRL ID'
-SEQUENCE_COLUMN = 'Sequence Number' # SEQ
-LAT_COLUMN = 'Latitude'
-LON_COLUMN = 'Longitude'
+ID_COLUMN = 'FIR_ID'
+MIN_LVL = 'MIN_LVL'
+MAX_LVL = 'MAX_LVL'
+SEQUENCE_COLUMN = 'SEQ' # SEQ
+LAT_COLUMN = 'LAT'
+LON_COLUMN = 'LON'
 LEVEL_COLUMN = 'Flight Level'
 TIME_COLUMN = 'Time Over'
 FIR_ID = 'FIR_ID'
 ENTRY_TIME = 'ENTRY'
 EXIT_TIME = 'EXIT'
+
+### Trajectories ###
+ID_COLUMN = 'ECTRL ID'
+SEQUENCE_COLUMN = 'Sequence Number' # SEQ
+TIME_COLUMN = 'Time Over'
+FLIGHT_LVL = 'Flight Level'
+LAT_COLUMN = 'Latitude'
+LON_COLUMN = 'Longitude'
 
 # --- SKRIPT-LOGIK ---
 
@@ -40,7 +50,7 @@ def aggregate_trajectories():
         df.columns = df.columns.str.strip()
 
         # Überprüfe, ob alle benötigten Spalten existieren
-        required_columns = [ID_COLUMN, SEQUENCE_COLUMN, LAT_COLUMN, LON_COLUMN, LEVEL_COLUMN, TIME_COLUMN] # FIR_ID, ENTRY_TIME, EXIT_TIME
+        required_columns = [ID_COLUMN, SEQUENCE_COLUMN, LAT_COLUMN, LON_COLUMN, FLIGHT_LVL, TIME_COLUMN] # FIR_ID, ENTRY_TIME, EXIT_TIME
         if not all(col in df.columns for col in required_columns):
             print("\nFEHLER: Nicht alle benötigten Spalten wurden in der CSV gefunden.")
             print(f"Benötigt werden: {required_columns}")
@@ -65,15 +75,21 @@ def aggregate_trajectories():
     
     # Erstelle eine neue Spalte, die die gewünschten Werte als Tupel enthält
     df_sorted['trajectory_point'] = df_sorted.apply(
-        lambda row: (row[LAT_COLUMN], row[LON_COLUMN], row[LEVEL_COLUMN], row[TIME_COLUMN]), # lambda row: (row[LAT_COLUMN], row[LON_COLUMN], row[LEVEL_COLUMN], row[TIME_COLUMN]) für Trajektorien
+        lambda row: (row[LAT_COLUMN], row[LON_COLUMN], row[FLIGHT_LVL], row[TIME_COLUMN]), # lambda row: (row[LAT_COLUMN], row[LON_COLUMN], row[LEVEL_COLUMN], row[TIME_COLUMN]) für Trajektorien
         axis=1
     )
     
     # Gruppiere nach der ID und fasse die Tupel in einer Liste zusammen
-    aggregated = df_sorted.groupby(ID_COLUMN)['trajectory_point'].apply(list)
+    aggregated_df = df_sorted.groupby(ID_COLUMN).agg(
+        # Für MIN_LVL und MAX_LVL nimm den ersten Wert, da sie pro FIR_ID identisch sind
+        #MIN_LVL=(MIN_LVL, 'first'),
+        #MAX_LVL=(MAX_LVL, 'first'),
+        # Für 'geometry_point' erstelle eine Liste aus allen Tupeln
+        trajectory_points=('trajectory_point', list)      
+    )
     
     # 3. Ergebnis in einen sauberen DataFrame umwandeln
-    result_df = aggregated.reset_index(name='trajectory_array')
+    result_df = aggregated_df.reset_index()
     
     print("\nAggregation abgeschlossen.")
     print(f"Anzahl der einzigartigen Flüge (und somit Zeilen): {len(result_df):,}")
