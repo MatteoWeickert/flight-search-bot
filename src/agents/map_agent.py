@@ -83,7 +83,7 @@ def create_map_agent():
     
     def generate_map_output(state: MapState) -> MapState:
         results_json = json.dumps(state["cypher_results"])
-        prompt = map_prompt.format(results_json=results_json)
+        prompt = map_prompt.format(results_json=results_json, filters=state["filters"])
         map_output = llm.invoke(prompt).content
         state["map_output"] = map_output
         return state
