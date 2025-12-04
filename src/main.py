@@ -1,6 +1,6 @@
 from flask import Flask, request, jsonify
 from flask_cors import CORS
-from src.agents.supervisor import process_query
+from agents.supervisor import process_query
 
 app = Flask(__name__, static_folder=".", static_url_path="")
 CORS(app, resources={r"/chat": {"origins": "*"}})

@@ -6,9 +6,9 @@ from langchain.prompts import PromptTemplate
 from langgraph.graph import StateGraph, END
 from typing import TypedDict, List
 import json
-from qa_agent import qa_agent
-from map_agent import map_agent
-from table_agent import table_agent
+from agents.qa_agent import qa_agent
+from agents.map_agent import map_agent
+from agents.table_agent import table_agent
 
 load_dotenv()
 
