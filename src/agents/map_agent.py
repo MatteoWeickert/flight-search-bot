@@ -25,9 +25,17 @@ def create_map_agent():
       You are the Map Output Agent in a FlightGPT environment.
       You receive Cypher query results from a Neo4j graph and must output ONLY a valid JSON object with this exact structure (GeoJSON FeatureCollection plus meta). The user has the ability 
       to choose from filters. Airport (ap), Trajectories (tr) and others (ot). ap, tr and ot can be switched on alone while ap and tr can be combined. Choose which data to show the user according to the filters.
-      If AP is choosen, display the airports that are resulting within the done query. If TR is choosen, display the trajectories that are resulting within the done query.If OT is choosen, think of something fitting that you want to display out of the data. 
+        RULES FOR DISPLAY:
+        1. If AP is choosen, display the airports.
+        2. If TR is choosen, display the trajectories.
+        3. If OT is choosen, display other relevant data.
+        4. IF NO FILTERS ARE CHOSEN ([]), DISPLAY ALL AVAILABLE GEOMETRY (Airports AND Trajectories).**     
       The user choosed: {filters}
-      
+      Note: If multiple results contain geometry, include ALL of them in the "features" array — do not limit output to a single example.
+
+      -CRITICAL PARSING RULE: If you see a field like "tr.trajectory_array" containing a STRING that looks like a list (e.g. "[(50.1, 7.0, ...)]"), YOU MUST TREAT IT AS A VALID LIST OF COORDINATES for your LineString geometry. Do not treat it as a literal string. Parse the coordinates inside it to build the "coordinates" array of your GeoJSON LineString.
+                                              
+      Example structure:
       {{
         "type": "FeatureCollection",
         "features": [
@@ -39,6 +47,16 @@ def create_map_agent():
             }},
             "properties": {{
               "example": "value"
+            }}
+          }},
+          {{
+            "type": "Feature",
+            "geometry": {{
+              "type": "LineString",
+              "coordinates": [[0.0,0.0],[1.0,1.0]]
+            }},
+            "properties": {{
+              "example2": "value2"
             }}
           }}
         ],
@@ -82,11 +100,17 @@ def create_map_agent():
     """)
     
     def generate_map_output(state: MapState) -> MapState:
-        results_json = json.dumps(state["cypher_results"])
-        prompt = map_prompt.format(results_json=results_json)
-        map_output = llm.invoke(prompt).content
-        state["map_output"] = map_output
-        return state
+      results_json = json.dumps(state["cypher_results"], default=str) # Added default=str to handle Dates safely
+      
+      print(f"\n[DEBUG] Map Agent - Input JSON (First 500 chars):\n{results_json[:500]}...")
+      print(f"[DEBUG] Map Agent - Active Filters: {state['filters']}")
+
+      prompt = map_prompt.format(results_json=results_json, filters=state["filters"])
+      map_output = llm.invoke(prompt).content
+      
+      state["map_output"] = map_output
+      return state
+
     
     workflow = StateGraph(MapState)
     workflow.add_node("generate_map_output", generate_map_output)
