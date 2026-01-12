@@ -31,6 +31,7 @@ def create_table_agent():
         Rules:
         - Output strictly valid HTML for a table. Do NOT output markdown, code fences, or explanations.
         - The table must include a header row with column names.
+        - Never add trajectory data in the table; its too long to display and therefore not useful
         - Base the table content on the Cypher results you receive; copy existing values, do not invent data.
         - If the result set is empty, output a table with a single row and cell stating "No results for the query in the current graph.".
         
@@ -60,7 +61,10 @@ def create_table_agent():
     
     def generate_table_output(state: TableState) -> TableState:
         results_json = json.dumps(state["cypher_results"])
-        prompt = table_prompt.format(results_json=results_json)
+        # include filters and query in the prompt formatting to avoid KeyError
+        f = state.get("filters", {}) if isinstance(state, dict) else state.get("filters", {})
+        q = state.get("query", "")
+        prompt = table_prompt.format(results_json=results_json, filters=f, query=q)
         table_output = llm.invoke(prompt).content
         state["table_output"] = table_output
         return state

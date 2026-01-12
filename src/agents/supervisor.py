@@ -37,7 +37,7 @@ def create_supervisor():
         
         Available agents:
         - qa_agent: ALWAYS called - generates text chat answer from Neo4j graph data
-        - map_agent: Visualizes geospatial data on a map (airports, routes, trajectories)
+        - map_agent: ALWAYS called - Visualizes geospatial data on a map (airports, routes, trajectories)
         - table_agent: Generates HTML tables for complex data that needs detailed inspection
         
         RULES:
@@ -106,26 +106,33 @@ def create_supervisor():
         return state
     
     def call_qa_agent(state: SupervisorState) -> SupervisorState:
-        result = qa_agent.invoke({"query": state["query"]})
+        print("DEBUG: call_qa_agent — filters:", state.get("filters"))
+        result = qa_agent.invoke({"query": state["query"], "filters": state["filters"]})
         state["text_answer"] = result["text_answer"]
         state["cypher_query"] = result["cypher_query"]
         state["cypher_results"] = result["cypher_results"]
         return state
     
     def call_map_agent(state: SupervisorState) -> SupervisorState:
+        print("DEBUG: call_map_agent — cypher_results length:", len(state.get("cypher_results", [])))
+        print("DEBUG: call_map_agent — filters:", state.get("filters"))
         result = map_agent.invoke({
             "cypher_results": state["cypher_results"],
             "filters": state["filters"]
         })
+        print("DEBUG: map_agent output (first 400 chars):", (result.get("map_output") or "")[:400])
         state["map_output"] = result["map_output"]
         return state
     
     def call_table_agent(state: SupervisorState) -> SupervisorState:
+        print("DEBUG: call_table_agent — cypher_results length:", len(state.get("cypher_results", [])))
+        print("DEBUG: call_table_agent — filters:", state.get("filters"))
         result = table_agent.invoke({
             "cypher_results": state["cypher_results"],
             "filters": state["filters"],
             "query": state["query"]
         })
+        print("DEBUG: table_agent output length:", len(result.get("table_output", "")))
         state["table_output"] = result["table_output"]
         return state
     

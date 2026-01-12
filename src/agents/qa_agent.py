@@ -5,6 +5,7 @@ from langchain_openai import ChatOpenAI
 from langchain.prompts import PromptTemplate
 from langgraph.graph import StateGraph, END
 from typing import TypedDict
+import ast
 
 load_dotenv()
 
@@ -14,6 +15,7 @@ class QAState(TypedDict):
     cypher_results: list
     text_answer: str
     schema: str
+    filters: dict
 
 def create_qa_agent():
     llm = ChatOpenAI(
@@ -50,6 +52,20 @@ def create_qa_agent():
         - Only use existing Labels/Properties/Relations from the schema.
         - Use no assumptions, invent no additional nodes/relations.
         - Return ONLY the Cypher query (no explanations, no markdown).
+        - The user may provide filters (Airport/Trajectories/points). Consider them when generating the query.
+        User filters: {filters}
+                                                 
+        MADATORY !! IMPORTANT RULES FOR FILTERS ({filters}):
+        1. If filter contains 'tj' (Trajectories):
+        - You MUST use: OPTIONAL MATCH (f)-[:has_route]->(tr:Trajectory)
+        - You MUST return: tr.trajectory_array
+        2. If filter contains 'ap' (Airports):
+        - You MUST return latitude/longitude for both Departure and Arrival airports (DEP_AP_LAT, DEP_AP_LON, etc.)
+        3. If filter contains both 'ap' and 'tj', apply both rules above.
+        4. If filter contains 'ot' (others):
+        be creative in what to include on the map (can be trajectories or/and airports too)
+        5. If no filters are provided, try to anticipate that spatial data might be useful and include at least trajectories or airport coordinates, based on what could be most interesting for the user query.
+       
         
         Question: {query}
     """)
@@ -73,17 +89,36 @@ def create_qa_agent():
     """)
     
     def generate_cypher(state: QAState) -> QAState:
-        prompt = cypher_prompt.format(schema=schema_text, query=state["query"])
+        # include filters if provided
+        f = state.get("filters", {}) if isinstance(state, dict) else {}
+        prompt = cypher_prompt.format(schema=schema_text, query=state["query"], filters=f)
         cypher_query = llm.invoke(prompt).content
+        
+        print(f"\n[DEBUG] QA Agent - Generated Cypher:\n{cypher_query}\n")
+
         state["cypher_query"] = cypher_query
         state["schema"] = schema_text
         return state
-    
+
     def execute_cypher(state: QAState) -> QAState:
         try:
             results = graph_db.query(state["cypher_query"])
-            state["cypher_results"] = results
+            
+            clean_results = []
+            for row in results:
+                clean_row = row.copy()
+                for key, value in clean_row.items():
+                    if "trajectory" in key.lower() and isinstance(value, str) and value.startswith("["):
+                        try:
+                            clean_row[key] = ast.literal_eval(value)
+                        except:
+                            pass
+                clean_results.append(clean_row)
+
+            state["cypher_results"] = clean_results
+            
         except Exception as e:
+            print(f"[ERROR] QA Agent - Cypher Execution Failed: {e}")
             state["cypher_results"] = []
         return state
     
@@ -109,5 +144,4 @@ def create_qa_agent():
     
     return workflow.compile()
 
-# Export for use by supervisor
 qa_agent = create_qa_agent()

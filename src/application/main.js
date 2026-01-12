@@ -11,6 +11,7 @@ const dataPanelClose = document.getElementById("dataPanelClose");
 
 const filterState = new Set();
 const filterButtons = document.querySelectorAll('.filter-btn');
+// no user selection on map — selections are driven by agents/queries
 
 const reasoningToggle = document.getElementById('reasoningToggle');
 const reasoningLabel = document.getElementById('reasoningLabel');
@@ -72,6 +73,7 @@ require([
   window.GraphicsLayer = GraphicsLayer;
   window.Graphic = Graphic;
   view.ui.components = [];
+  // map is passive — agents provide features to display
 });
 
 function appendMessage(role, text, reasoningText = null) {
@@ -241,7 +243,7 @@ async function sendMessage() {
     console.error("[JS] Fetch Error:", err);
     appendMessage(
       "bot",
-      "Es ist ein Fehler aufgetreten. Bitte später erneut versuchen."
+      "Service is currently not available. Please try again later."
     );
   } finally {
     setLoading(false);
@@ -334,22 +336,6 @@ function displayOnMap(geojson) {
   }
 
   resultLayer.addMany(graphics);
-
-  const firstGeom = graphics[0].geometry;
-  if (graphics.length === 1 && firstGeom.type === "point") {
-    view.goTo({
-      target: firstGeom,
-      zoom: 2
-    });
-  }
-  else if (resultLayer.fullExtent) {
-    const ext = resultLayer.fullExtent.expand(1.2);
-    view.goTo(ext).then(() => {
-      if (view.zoom < 2) {
-        view.zoom = 2;
-      }
-    });
-  }
 }
 
 function showTablePanel(html) {

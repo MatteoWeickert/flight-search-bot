@@ -14,7 +14,7 @@ def chat():
     data = request.get_json(silent=True) or {}
     msg = (data.get("message") or "").strip()
     filters = data.get("filters", {})
-    reasoning = data.get("reasoning", False)
+    reasoning = data.get("reasoning", True)
     
     if not msg:
         return jsonify({"error": "message missing"}), 400
