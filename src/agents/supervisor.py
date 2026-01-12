@@ -74,6 +74,7 @@ def create_supervisor():
         - table_agent: Generates structured HTML table with detailed data
         
         Keep it concise and user-friendly. Use terms like "to answer your question", "to visualize", "to show details".
+        Do NOT add ** or any other markdown formatting.
     """)
     
     def route_query(state: SupervisorState) -> SupervisorState:
