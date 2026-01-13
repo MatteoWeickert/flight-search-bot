@@ -3,6 +3,8 @@ const chatInput = document.getElementById("chatInput");
 const sendBtn = document.getElementById("sendBtn");
 const loading = document.getElementById("chatLoading");
 let resultLayer = null;
+const messages = [];
+let nextMessageId = 1;
 
 const dataBtn = document.getElementById("dataBtn");
 const dataPanel = document.getElementById("dataPanel");
@@ -11,7 +13,6 @@ const dataPanelClose = document.getElementById("dataPanelClose");
 
 const filterState = new Set();
 const filterButtons = document.querySelectorAll('.filter-btn');
-// no user selection on map — selections are driven by agents/queries
 
 const reasoningToggle = document.getElementById('reasoningToggle');
 const reasoningLabel = document.getElementById('reasoningLabel');
@@ -73,7 +74,6 @@ require([
   window.GraphicsLayer = GraphicsLayer;
   window.Graphic = Graphic;
   view.ui.components = [];
-  // map is passive — agents provide features to display
 });
 
 function appendMessage(role, text, reasoningText = null) {
@@ -207,6 +207,11 @@ async function sendMessage() {
   console.log("[JS] Active filters:", Array.from(filterState));
   console.log("[JS] Reasoning enabled:", reasoningToggle.checked);
 
+  // save user message in the requested structure and keep as variable
+  const savedMessage = [messages.length > 0, [nextMessageId, String(text)]];
+  messages.push(savedMessage);
+  nextMessageId += 1;
+
   appendMessage("user", text);
   chatInput.value = "";
   autosize();
@@ -218,6 +223,8 @@ async function sendMessage() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         message: text,
+        saved_message: savedMessage,
+        messages: messages,
         filters: Array.from(filterState),
         reasoning: reasoningToggle.checked
       }),

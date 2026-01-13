@@ -15,11 +15,12 @@ def chat():
     msg = (data.get("message") or "").strip()
     filters = data.get("filters", {})
     reasoning = data.get("reasoning", True)
-    
+    messages = data.get("messages", [])
+
     if not msg:
         return jsonify({"error": "message missing"}), 400
-    
-    reply_obj = process_query(msg, filters, reasoning)
+
+    reply_obj = process_query(msg, filters, reasoning, messages)
     return jsonify(reply_obj)
 
 if __name__ == "__main__":
