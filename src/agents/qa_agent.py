@@ -23,6 +23,7 @@ def create_qa_agent():
         api_key=os.getenv("GWDG_API_KEY"),
         base_url=os.getenv("GWDG_BASE_URL"),
         temperature=0,
+        max_tokens=1024
     )
     
     graph_db = Neo4jGraph(
@@ -51,6 +52,7 @@ def create_qa_agent():
         IMPORTANT RULES:
         - Only use existing Labels/Properties/Relations from the schema.
         - Use no assumptions, invent no additional nodes/relations.
+        - Only query the database when the user query requires it (or at least requests data that could be in the graph). Return () if not
         - Return ONLY the Cypher query (no explanations, no markdown).
         - The user may provide filters (Airport/Trajectories/points). Consider them when generating the query.
         User filters: {filters}

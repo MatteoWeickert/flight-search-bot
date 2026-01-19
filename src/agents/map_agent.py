@@ -19,6 +19,7 @@ def create_map_agent():
         api_key=os.getenv("GWDG_API_KEY"),
         base_url=os.getenv("GWDG_BASE_URL"),
         temperature=0,
+        max_tokens=1024
     )
 
     map_prompt = PromptTemplate.from_template("""
