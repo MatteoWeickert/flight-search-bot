@@ -27,9 +27,9 @@ class SupervisorState(TypedDict):
 
 def create_supervisor():
     llm = ChatOpenAI(
-        model=os.getenv("GWDG_MODEL"),
-        api_key=os.getenv("GWDG_API_KEY"),
-        base_url=os.getenv("GWDG_BASE_URL"),
+        model=os.getenv("OPENAI_MODEL"),
+        api_key=os.getenv("OPENAI_KEY"),
+        base_url=os.getenv("OPENAI_API_BASE"),
         temperature=0
     )
 
