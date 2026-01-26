@@ -3,6 +3,7 @@ const chatInput = document.getElementById("chatInput");
 const sendBtn = document.getElementById("sendBtn");
 const loading = document.getElementById("chatLoading");
 let resultLayer = null;
+let uploadLayer = null; // separate layer for user-uploaded polygon
 const messages = [];
 let nextMessageId = 1;
 
@@ -22,6 +23,10 @@ const filterButtons = document.querySelectorAll('.filter-btn');
 const reasoningToggle = document.getElementById('reasoningToggle');
 const reasoningLabel = document.getElementById('reasoningLabel');
 
+const uploadBtn = document.getElementById('uploadBtn');
+const geojsonInput = document.getElementById('geojsonInput');
+let uploadedGeojson = null; // will hold the validated geojson for later processing
+
 // Ensure panels are hidden on load
 document.addEventListener('DOMContentLoaded', () => {
   if (kpiPanel) kpiPanel.classList.add('is-hidden');
@@ -31,6 +36,71 @@ document.addEventListener('DOMContentLoaded', () => {
 reasoningToggle.addEventListener('change', () => {
   console.log('Reasoning enabled:', reasoningToggle.checked);
 });
+
+// Upload button -> open hidden file picker
+if (uploadBtn && geojsonInput) {
+  uploadBtn.addEventListener('click', () => geojsonInput.click());
+
+  geojsonInput.addEventListener('change', (ev) => {
+    const file = geojsonInput.files && geojsonInput.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      let data;
+      try {
+        data = JSON.parse(String(reader.result));
+      } catch (e) {
+        showStatusIcon('error', 'Invalid JSON file', 3000);
+        geojsonInput.value = '';
+        return;
+      }
+
+      // Validation rules (simple):
+      // - Accept FeatureCollection with exactly one feature whose geometry is Polygon or MultiPolygon
+      // - OR accept a Feature whose geometry is Polygon
+      // - OR accept a raw geometry object of type Polygon
+      let ok = false;
+      if (data && typeof data === 'object') {
+        if (data.type === 'FeatureCollection') {
+          if (Array.isArray(data.features) && data.features.length === 1) {
+            const feat = data.features[0];
+            const g = feat && feat.geometry;
+            if (g && (g.type === 'Polygon' || g.type === 'MultiPolygon')) ok = true;
+          }
+        } else if (data.type === 'Feature') {
+          const g = data.geometry;
+          if (g && g.type === 'Polygon') ok = true;
+        } else if (data.type === 'Polygon') {
+          ok = true;
+        }
+      }
+
+      if (ok) {
+        uploadedGeojson = data;
+        showStatusIcon('ok', 'GeoJSON accepted', 3000);
+        // normalize to a FeatureCollection
+        let fc = null;
+        if (data.type === 'FeatureCollection') fc = data;
+        else if (data.type === 'Feature') fc = { type: 'FeatureCollection', features: [data] };
+        else if (data.type === 'Polygon' || data.type === 'MultiPolygon') fc = { type: 'FeatureCollection', features: [{ type: 'Feature', properties: {}, geometry: data }] };
+
+        if (fc) {
+          // display uploaded polygon on its own layer so agent results don't overwrite it
+          showUploadedGeojson(fc);
+        }
+
+        // status will clear automatically from showStatusIcon
+      } else {
+        showStatusIcon('error', 'Please provide a single Polygon or a FeatureCollection with one feature',3000);
+      }
+
+      geojsonInput.value = '';
+    };
+
+    reader.readAsText(file);
+  });
+}
 
 filterButtons.forEach(btn => {
   btn.addEventListener('click', () => {
@@ -173,6 +243,49 @@ function updateLoadingStatus(text) {
   if (statusSpan) {
     statusSpan.textContent = text;
   }
+}
+
+// Show a check or X icon alongside the loading status text for a short duration
+function showStatusIcon(type, text, duration = 3000) {
+  // Always show the global loading spinner while showing a status icon
+  setLoading(true);
+  updateLoadingStatus(text);
+
+  const statusSpan = document.getElementById("loadingStatusText");
+  if (!statusSpan) {
+    setTimeout(() => setLoading(false), duration);
+    return;
+  }
+
+  let iconSpan = document.getElementById("loadingStatusIcon");
+  if (!iconSpan) {
+    iconSpan = document.createElement('span');
+    iconSpan.id = 'loadingStatusIcon';
+    iconSpan.style.display = 'inline-flex';
+    iconSpan.style.alignItems = 'center';
+    iconSpan.style.marginRight = '8px';
+    // insert icon before the status text
+    statusSpan.parentNode.insertBefore(iconSpan, statusSpan);
+  }
+
+  if (type === 'ok') {
+    iconSpan.innerHTML = `\
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">\
+        <path d="M20 6L9 17L4 12" stroke="#22c55e" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>\
+      </svg>`;
+  } else {
+    iconSpan.innerHTML = `\
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">\
+        <path d="M18 6L6 18M6 6L18 18" stroke="#ef4444" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>\
+      </svg>`;
+  }
+
+  // clear after duration
+  setTimeout(() => {
+    const el = document.getElementById('loadingStatusIcon');
+    if (el) el.innerHTML = '';
+    setLoading(false);
+  }, duration);
 }
 
 function autosize() {
@@ -330,6 +443,27 @@ function displayOnMap(geojson) {
           width: 2,
         };
       }
+      else if (g.type === "Polygon" && coords.length) {
+        // coords is an array of linear rings
+        geometry = {
+          type: "polygon",
+          rings: coords.map(r => r.map(c => [c[0], c[1]]))
+        };
+        symbol = {
+          type: "simple-fill",
+          color: [0, 200, 200, 0.2],
+          outline: { color: "cyan", width: 2 }
+        };
+      }
+      else if (g.type === "MultiPolygon" && coords.length) {
+        // coords is an array of polygons -> flatten rings
+        const rings = [];
+        coords.forEach(polygon => {
+          polygon.forEach(ring => rings.push(ring.map(c => [c[0], c[1]])));
+        });
+        geometry = { type: "polygon", rings };
+        symbol = { type: "simple-fill", color: [0,200,200,0.18], outline: { color: "cyan", width: 2 } };
+      }
 
       if (!geometry) return null;
 
@@ -343,6 +477,44 @@ function displayOnMap(geojson) {
 
   if (!graphics.length) return;
   resultLayer.addMany(graphics);
+}
+
+// Show uploaded polygon(s) on a separate layer and zoom to it
+function showUploadedGeojson(geojson) {
+  const view = window.view;
+  const GraphicsLayer = window.GraphicsLayer;
+  const Graphic = window.Graphic;
+  if (!view || !view.map || !GraphicsLayer || !Graphic) return;
+
+  if (!uploadLayer) {
+    uploadLayer = new GraphicsLayer({ id: 'upload-layer' });
+    view.map.add(uploadLayer);
+  } else {
+    uploadLayer.removeAll();
+  }
+
+  const features = (geojson && geojson.features) || [];
+  const graphics = features.map(f => {
+    const g = f.geometry || {};
+    if (g.type !== 'Polygon' && g.type !== 'MultiPolygon') return null;
+    const coords = g.coordinates || [];
+    let rings = [];
+    if (g.type === 'Polygon') {
+      rings = coords.map(r => r.map(c => [c[0], c[1]]));
+    } else {
+      coords.forEach(polygon => polygon.forEach(ring => rings.push(ring.map(c => [c[0], c[1]]))));
+    }
+    return new Graphic({
+      geometry: { type: 'polygon', rings },
+      symbol: { type: 'simple-fill', color: [255,255,255,0.33], outline: { color: '#ffffff', width: 2 } },
+      attributes: f.properties || {}
+    });
+  }).filter(g => g && g.geometry);
+
+  if (!graphics.length) return;
+  uploadLayer.addMany(graphics);
+  // zoom to uploaded polygon
+  try { view.goTo(uploadLayer.graphics); } catch (e) {}
 }
 
 function showTablePanel(html) {

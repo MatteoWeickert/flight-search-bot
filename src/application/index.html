@@ -7,6 +7,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;600&display=swap" rel="stylesheet">
   <script type="module" src="https://js.arcgis.com/calcite-components/3.2.1/calcite.esm.js"></script>
   <link rel="stylesheet" href="https://js.arcgis.com/4.33/esri/themes/dark/main.css" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css">
   <link rel="stylesheet" href="style.css">
   <script src="https://js.arcgis.com/4.33/"></script>
   <script defer type="module" src="https://js.arcgis.com/4.33/map-components/"></script>
@@ -81,12 +82,16 @@
               </div>
               <div class="chat-input">
                 <textarea id="chatInput" class="chat-input-field" rows="1" placeholder="Type in your question.."></textarea>
+                <button id="uploadBtn" type="button" class="icon-button" title="Upload GeoJSON" aria-label="Upload GeoJSON">
+                  <i class="bi bi-paperclip" style="font-size:18px;color:currentColor;" aria-hidden="true"></i>
+                </button>
                 <button id="sendBtn" type="button" class="icon-button" title="Senden" aria-label="Submit">
                   <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor" class="bi bi-send" viewBox="0 0 16 16">
                     <path d="M15.854.146a.5.5 0 0 1 .11.54l-5.819 14.547a.75.75 0 0 1-1.329.124l-3.178-4.995L.643 7.184a.75.75 0 0 1 .124-1.33L15.314.037a.5.5 0 0 1 .54.11ZM6.636 10.07l2.761 4.338L14.13 2.576zm6.787-8.201L1.591 6.602l4.339 2.76z"/>
                   </svg>
                 </button>
               </div>
+              <input id="geojsonInput" type="file" accept=".geojson,application/geo+json,application/json,.json" style="display:none" />
               <div class="reasoning-toggle-wrapper">
                 <label class="reasoning-toggle">
                   <input type="checkbox" id="reasoningToggle" class="reasoning-toggle-input">
