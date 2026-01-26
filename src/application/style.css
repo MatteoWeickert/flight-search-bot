@@ -820,9 +820,317 @@ button:focus-visible,textarea:focus-visible{
   transition: max-height 0.3s ease;
   margin-top: 6px;
   padding: 0 8px;
-  font-size: 11px;
+  font-size: 10px;
   color: var(--fg-1);
   opacity: 0.85;
   line-height: 1.4;
 }
 
+.kpi-panel {
+  position: absolute;
+  right: 16px;
+  top: 80px;
+  height: auto;
+  max-height: 40vh;
+  width: clamp(360px, 32vw, 520px);
+  z-index: 3; /* Higher than data panel */
+  display: flex;
+}
+
+.data-panel {
+  position: absolute;
+  right: 16px;
+  bottom: 16px;
+  height: 45vh;
+  max-height: 45vh;
+  width: clamp(360px, 32vw, 520px);
+  z-index: 2;
+  display: flex;
+}
+
+.kpi-panel.is-hidden,
+.data-panel.is-hidden {
+  display: none;
+}
+
+.kpi-boundary {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+  padding: 12px;
+  gap: 10px;
+}
+
+.kpi-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 10px;
+  border-radius: 12px;
+  background: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, .9),
+    rgba(245, 245, 245, .85)
+  );
+  border: 1px solid rgba(0, 0, 0, .12);
+}
+
+.kpi-header-title {
+  margin: 0;
+  font-weight: 600;
+  letter-spacing: .4px;
+  font-size: 13px;
+}
+
+.kpi-header-close {
+  appearance: none;
+  border: 0;
+  cursor: pointer;
+  background: rgba(0, 0, 0, .04);
+  color: inherit;
+  padding: 4px 8px;
+  border-radius: 8px;
+  font-size: 12px;
+  transition: background .2s ease, transform .15s ease;
+}
+
+.kpi-header-close:hover {
+  background: rgba(125, 79, 217, .12);
+  transform: translateY(-1px);
+}
+
+.kpi-body {
+  flex: 1;
+  border-radius: 12px;
+  border: 1px solid rgba(0, 0, 0, 0.12);
+  background: linear-gradient(180deg, rgba(252, 252, 252, 0.95), rgba(248, 248, 248, 0.98));
+  padding: 16px;
+  overflow-y: auto;
+  overflow-x: hidden;
+  max-height: calc(40vh - 60px);
+}
+
+.kpi-body::-webkit-scrollbar {
+  width: 10px;
+}
+
+.kpi-body::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.kpi-body::-webkit-scrollbar-thumb {
+  background: linear-gradient(
+    180deg,
+    rgba(0, 0, 0, .15),
+    rgba(0, 0, 0, .08)
+  );
+  border-radius: 8px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+
+.kpi-body::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(
+    180deg,
+    rgba(0, 136, 221, .25),
+    rgba(0, 136, 221, .15)
+  );
+  background-clip: padding-box;
+}
+
+@supports (scrollbar-color: auto) {
+  .kpi-body {
+    scrollbar-color: rgba(0, 0, 0, .2) transparent;
+    scrollbar-width: thin;
+  }
+}
+
+.kpi-wrapper {
+  width: 100%;
+  height: 100%;
+}
+
+.kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 12px;
+  padding-bottom: 4px;
+}
+
+.kpi-card {
+  background: linear-gradient(135deg, rgba(0, 136, 221, 0.08), rgba(125, 79, 217, 0.06));
+  border: 1px solid rgba(0, 136, 221, 0.2);
+  border-radius: 12px;
+  padding: 14px;
+  text-align: center;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.kpi-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(0, 136, 221, 0.15);
+}
+
+.kpi-value {
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--accent);
+  margin-bottom: 4px;
+  letter-spacing: -0.5px;
+}
+
+.kpi-label {
+  font-size: 10px;
+  font-weight: 500;
+  color: var(--fg-1);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  opacity: 0.85;
+}
+
+@media (max-width: 1200px) {
+  .kpi-panel {
+    width: clamp(340px, 36vw, 460px);
+    max-height: 38vh;
+  }
+  
+  .data-panel {
+    width: clamp(300px, 35vw, 400px);
+    height: 40vh;
+    max-height: 40vh;
+  }
+  
+  .kpi-body {
+    max-height: calc(38vh - 60px);
+  }
+}
+
+@media (max-width: 960px) {
+  .kpi-panel {
+    right: 12px;
+    top: 70px;
+    width: min(92vw, 420px);
+    max-height: 35vh;
+  }
+  
+  .data-panel {
+    right: 12px;
+    bottom: 12px;
+    width: min(90vw, 400px);
+    height: 38vh;
+  }
+  
+  .kpi-body {
+    max-height: calc(35vh - 60px);
+  }
+  
+  .kpi-grid {
+    grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+  }
+}
+
+@media (max-width: 560px) {
+  .kpi-panel {
+    right: 8px;
+    top: 60px;
+    width: calc(100vw - 16px);
+    max-height: 30vh;
+  }
+  
+  .data-panel {
+    right: 8px;
+    bottom: 8px;
+    width: calc(100vw - 16px);
+    height: 35vh;
+  }
+  
+  .kpi-body {
+    max-height: calc(30vh - 60px);
+    padding: 12px;
+  }
+  
+  .kpi-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+.loading-indicator {
+  position: absolute;
+  left: 10px;
+  top: 12px;
+  display: flex;
+  align-items: center;
+  gap: 8px; /* Abstand zwischen Text und Spinner */
+  z-index: 1;
+}
+
+.loading-status-text {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--accent); /* Oder var(--muted) wenn es dezenter sein soll */
+  white-space: nowrap;
+  letter-spacing: 0.3px;
+  animation: fadeIn 0.3s ease;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateX(5px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+.spinner {
+  flex-shrink: 0; /* Verhindert, dass der Spinner gedrückt wird */
+}
+
+/* --- REASONING STYLING UPDATE --- */
+
+.reasoning-wrapper {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid rgba(0, 0, 0, 0.08);
+}
+
+.reasoning-toggle-btn {
+  appearance: none;
+  border: 0;
+  background: rgba(0, 136, 221, 0.08);
+  color: var(--accent);
+  padding: 6px 10px; /* Etwas größerer Klickbereich */
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 500;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  transition: all 0.2s ease;
+  width: fit-content;
+}
+
+.reasoning-toggle-btn:hover {
+  background: rgba(0, 136, 221, 0.15);
+}
+
+.reasoning-icon {
+  transition: transform 0.3s ease;
+}
+
+.reasoning-content {
+  /* Startzustand: geschlossen */
+  max-height: 0;
+  overflow: hidden;
+  opacity: 0;
+  
+  /* Animation für Höhe, Padding und Opacity */
+  transition: max-height 0.3s ease, opacity 0.3s ease, padding 0.3s ease;
+  
+  margin-top: 0; /* Margin wird beim Öffnen via Padding im JS simuliert */
+  
+  /* Text Styling */
+  font-size: 11px; /* Besser lesbar */
+  color: var(--fg-1);
+  line-height: 1.5; /* Mehr Zeilenabstand */
+  white-space: pre-wrap; /* Zeilenumbrüche respektieren */
+}

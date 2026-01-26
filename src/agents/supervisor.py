@@ -1,11 +1,13 @@
 import os
 import re
+import json
+import traceback
 from dotenv import load_dotenv
 from langchain_openai import ChatOpenAI
 from langchain.prompts import PromptTemplate
 from langgraph.graph import StateGraph, END
-from typing import TypedDict, List
-import json
+from typing import TypedDict, List, Any
+
 from agents.qa_agent import qa_agent
 from agents.map_agent import map_agent
 from agents.table_agent import table_agent
@@ -14,7 +16,7 @@ load_dotenv()
 
 class SupervisorState(TypedDict):
     query: str
-    filters: dict
+    filters: List[str]
     reasoning: bool
     agents_to_call: List[str]
     reasoning_summary: str
@@ -23,28 +25,22 @@ class SupervisorState(TypedDict):
     text_answer: str
     map_output: str
     table_output: str
+    kpi_output: str
     messages: list
+    status_queue: Any  # NEU
 
 def create_supervisor():
     llm = ChatOpenAI(
         model=os.getenv("GWDG_MODEL"),
         api_key=os.getenv("GWDG_API_KEY"),
         base_url=os.getenv("GWDG_BASE_URL"),
-        temperature=0,
-        max_tokens=1024
+        temperature=0
     )
-
-    # --- New Prompt for Query Refinement ---
     refine_prompt = PromptTemplate.from_template("""
     You are an expert at rephrasing follow-up questions to be standalone queries.
-    Focus only on the user questions. The bot responses should not be part of the context.
-    
     Current conversation history: {messages}
     User's new query: {query}
-    
-    Rewrite the user's new query to be a standalone sentence that includes all necessary context from the history. 
-    Make it specific and complete so it can be understood without the history.
-    
+    Rewrite the user's new query to be a standalone sentence that includes all necessary context from the history.
     Standalone query:
     """)
 
@@ -53,61 +49,60 @@ def create_supervisor():
     
     Available agents:
     - qa_agent: ALWAYS called - generates text chat answer from Neo4j graph data
-    - map_agent: ALWAYS called - Visualizes geospatial data on a map (airports, routes, trajectories)
-    - table_agent: Generates HTML tables for complex data that needs detailed inspection
+    - map_agent: Visualizes geospatial data on a map (airports, routes, trajectories)
+    - table_agent: Generates HTML tables for detailed inspection
     
-    RULES:
-    1. ALWAYS include "qa" in your response (text answer is mandatory)
-    2. By DEFAULT, also include "map" to visualize spatial data (unless query is purely statistical/textual)
-    3. ONLY include "table" when:
-       - Query asks for detailed comparison of multiple entities
-       - Query involves complex data that needs verification
-       - Query explicitly asks for tabular format ("show table", "list all details")
-       - Query is about raw data inspection
-    4. The User can decide for every query on which filter he wants to focus on. Possible filters are Airport (ap), Trajectories (tj) and others (ot). ap, tj and ot can be switched on alone while ap and tj can be combined.
-    This information will be given to all other agents to adapt their behavior accordingly. The User chose: {filters}
+    User active filters: {filters}
+    Possible filters: 'ap' (Airports), 'tj' (Trajectories), 'ot' (Other).
     
-    Conversation history (most recent last) as array: {messages}
     User query: {query}
     
-    Respond with ONLY a JSON array of agent names to call, e.g.: ["qa", "map"] or ["qa", "map", "table"]
+    MANDATORY RULES:
+    1. ALWAYS include "qa" in your response (text answer is mandatory)
+    
+    2. ALWAYS include "map" when query involves:
+       - Flights, routes, trajectories, airports
+       - Words like "show", "display", "visualize", "map", "where"
+       - Any spatial/geographic data
+       - User has filters 'ap' or 'tj' active
+    
+    3. ALWAYS include "table" when query involves:
+       - Words like "show", "list", "display", "all", "details"
+       - Comparing multiple flights
+       - User explicitly asks for tabular format
+       - Inspection of detailed data
+    
+    4. For queries like "show flights from X", "display routes", "list departures":
+       - Include ALL THREE: ["qa", "map", "table"]
+    
+    Respond with ONLY a JSON array of agent names.
+    Examples:
+    - "Show flights from Cologne" -> ["qa", "map", "table"]
+    - "How many flights departed today?" -> ["qa"]
+    - "Visualize routes to Paris" -> ["qa", "map"]
     """)
 
     reasoning_prompt = PromptTemplate.from_template("""
-    You are explaining the reasoning behind the agent selection in a FlightGPT system.
-    Respond in the same language as the user's query.
-    
+    Explain briefly why these agents were selected.
     User query: {query}
     Selected agents: {agents}
     User filters: {filters}
-    
-    Create a SHORT summary (2-3 sentences maximum) explaining:
-    1. Why each agent was selected
-    2. What output is expected from each agent based on the user's query
-    
-    Agent descriptions:
-    - qa_agent: Queries Neo4j graph database and generates a text answer
-    - map_agent: Creates geographic visualization with points/routes on a map
-    - table_agent: Generates structured HTML table with detailed data
-    
-    Keep it concise and user-friendly. Use terms like "to answer your question", "to visualize", "to show details".
-    Do NOT add ** or any other markdown formatting.
+    Keep it to 1-2 sentences.
     """)
 
+
     def refine_query(state: SupervisorState) -> SupervisorState:
+        if state.get("status_queue"):
+            state["status_queue"].put({"type": "status", "msg": "Analyzing intent..."})
+            
         messages = state.get("messages", [])
         if messages and len(messages) > 0:
-            print("DEBUG: Refining query with history...")
             prompt = refine_prompt.format(
                 query=state["query"],
                 messages=json.dumps(messages, ensure_ascii=False)
             )
             refined_query = llm.invoke(prompt).content.strip()
-            print(f"DEBUG: Refined query: {refined_query}")
             state["query"] = refined_query
-        else:
-            print("DEBUG: No history found, skipping refinement.")
-            
         return state
 
     def route_query(state: SupervisorState) -> SupervisorState:
@@ -123,10 +118,19 @@ def create_supervisor():
             try:
                 agents = json.loads(json_match.group())
             except:
-                 agents = ["qa", "map"]
+                agents = ["qa", "map"]
         else:
             agents = ["qa", "map"]
-            
+        
+        query_lower = state["query"].lower()
+        spatial_keywords = ["show", "display", "visualize", "list", "flights", "routes", "departures", "arrivals"]
+        
+        if any(kw in query_lower for kw in spatial_keywords):
+            if "map" not in agents: agents.append("map")
+            if "table" not in agents and any(kw in query_lower for kw in ["show", "list", "display", "all"]):
+                agents.append("table")
+        
+        if "qa" not in agents: agents.insert(0, "qa")
         state["agents_to_call"] = agents
         return state
 
@@ -144,34 +148,43 @@ def create_supervisor():
         return state
 
     def call_qa_agent(state: SupervisorState) -> SupervisorState:
-        print("DEBUG: call_qa_agent — filters:", state.get("filters"))
-        result = qa_agent.invoke({"query": state["query"], "filters": state["filters"]})
+        if state.get("status_queue"):
+            state["status_queue"].put({"type": "status", "msg": "Consulting Flight Database..."})
+            
+        result = qa_agent.invoke({
+            "query": state["query"], 
+            "filters": state["filters"],
+            "status_queue": state.get("status_queue")
+        })
         state["text_answer"] = result["text_answer"]
         state["cypher_query"] = result["cypher_query"]
         state["cypher_results"] = result["cypher_results"]
         return state
 
     def call_map_agent(state: SupervisorState) -> SupervisorState:
-        print("DEBUG: call_map_agent — cypher_results length:", len(state.get("cypher_results", [])))
-        print("DEBUG: call_map_agent — filters:", state.get("filters"))
+        if state.get("status_queue"):
+            state["status_queue"].put({"type": "status", "msg": "Generating Map Data..."})
+            
         result = map_agent.invoke({
-            "cypher_results": state["cypher_results"], 
-            "filters": state["filters"]
+            "cypher_results": state["cypher_results"],
+            "filters": state["filters"],
+            "status_queue": state.get("status_queue")
         })
-        print("DEBUG: map_agent output (first 400 chars):", (result.get("map_output") or "")[:400])
         state["map_output"] = result["map_output"]
         return state
 
     def call_table_agent(state: SupervisorState) -> SupervisorState:
-        print("DEBUG: call_table_agent — cypher_results length:", len(state.get("cypher_results", [])))
-        print("DEBUG: call_table_agent — filters:", state.get("filters"))
+        if state.get("status_queue"):
+             state["status_queue"].put({"type": "status", "msg": "Creating Tables & Statistics..."})
+
         result = table_agent.invoke({
             "cypher_results": state["cypher_results"],
             "filters": state["filters"],
-            "query": state["query"]
+            "query": state["query"],
+            "status_queue": state.get("status_queue")
         })
-        print("DEBUG: table_agent output length:", len(result.get("table_output", "")))
         state["table_output"] = result["table_output"]
+        state["kpi_output"] = result.get("kpi_output", "")
         return state
 
     def should_call_map(state: SupervisorState) -> str:
@@ -185,7 +198,6 @@ def create_supervisor():
         return END
 
     workflow = StateGraph(SupervisorState)
-
     workflow.add_node("refine_query", refine_query)
     workflow.add_node("route_query", route_query)
     workflow.add_node("generate_reasoning", generate_reasoning)
@@ -195,37 +207,13 @@ def create_supervisor():
     workflow.add_node("check_table", lambda state: state)
 
     workflow.set_entry_point("refine_query")
-
     workflow.add_edge("refine_query", "route_query")
     workflow.add_edge("route_query", "generate_reasoning")
     workflow.add_edge("generate_reasoning", "qa_agent")
-
-    workflow.add_conditional_edges(
-        "qa_agent",
-        should_call_map,
-        {
-            "map_agent": "map_agent",
-            "check_table": "check_table"
-        }
-    )
-
-    workflow.add_conditional_edges(
-        "map_agent",
-        should_call_table,
-        {
-            "table_agent": "table_agent",
-            END: END
-        }
-    )
-
-    workflow.add_conditional_edges(
-        "check_table",
-        should_call_table,
-        {
-            "table_agent": "table_agent",
-            END: END
-        }
-    )
+    
+    workflow.add_conditional_edges("qa_agent", should_call_map, {"map_agent": "map_agent", "check_table": "check_table"})
+    workflow.add_conditional_edges("map_agent", should_call_table, {"table_agent": "table_agent", END: END})
+    workflow.add_conditional_edges("check_table", should_call_table, {"table_agent": "table_agent", END: END})
 
     workflow.add_edge("table_agent", END)
 
@@ -233,11 +221,9 @@ def create_supervisor():
 
 supervisor = create_supervisor()
 
-def process_query(query: str, filters: dict = None, reasoning: bool = False, messages: list = None) -> dict:
-    if filters is None:
-        filters = {}
-    if messages is None:
-        messages = []
+def process_query(query: str, filters: list = None, reasoning: bool = False, messages: list = None, status_queue = None) -> dict:
+    if filters is None: filters = []
+    if messages is None: messages = []
 
     initial_state = {
         "query": query,
@@ -250,13 +236,14 @@ def process_query(query: str, filters: dict = None, reasoning: bool = False, mes
         "text_answer": "",
         "map_output": "",
         "table_output": "",
-        "messages": messages
+        "kpi_output": "", 
+        "messages": messages,
+        "status_queue": status_queue
     }
 
     try:
         result = supervisor.invoke(initial_state)
     except Exception as e:
-        import traceback
         traceback.print_exc()
         result = initial_state
 
@@ -271,6 +258,7 @@ def process_query(query: str, filters: dict = None, reasoning: bool = False, mes
         "chat_text": result.get("text_answer", ""),
         "map": map_data,
         "table_html": result.get("table_output", ""),
+        "kpi_html": result.get("kpi_output", ""),
         "reasoning_summary": result.get("reasoning_summary", "")
     }
 

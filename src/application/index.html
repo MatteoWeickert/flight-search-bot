@@ -15,19 +15,17 @@
 <body>
   <div class="layout">
     <div class="map-wrapper">
-
       <div class="arcgismap">
         <div class="map-wrapper">
           <div id="map" class="arcgismap"></div>
         </div>
 
-
         <aside class="account-panel glass fade-in-down" aria-label="Account Panel">
           <div class="account-card">
             <div class="account-actions">
-              <button class="account-icon-slot" style="margin-left:-10px;"id="settingsBtn" aria-label="Settings">
-                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-sliders" viewBox="0 0 16 16">
-                  <path fill-rule="evenodd" d="M11.5 2a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3M9.05 3a2.5 2.5 0 0 1 4.9 0H16v1h-2.05a2.5 2.5 0 0 1-4.9 0H0V3zM4.5 7a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3M2.05 8a2.5 2.5 0 0 1 4.9 0H16v1H6.95a2.5 2.5 0 0 1-4.9 0H0V8zm9.45 4a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3m-2.45 1a2.5 2.5 0 0 1 4.9 0H16v1h-2.05a2.5 2.5 0 0 1-4.9 0H0v-1z"/>
+              <button class="account-icon-slot" id="kpiBtn" aria-label="Statistics">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-graph-up" viewBox="0 0 16 16">
+                  <path fill-rule="evenodd" d="M0 0h1v15h15v1H0zm14.817 3.113a.5.5 0 0 1 .07.704l-4.5 5.5a.5.5 0 0 1-.74.037L7.06 6.767l-3.656 5.027a.5.5 0 0 1-.808-.588l4-5.5a.5.5 0 0 1 .758-.06l2.609 2.61 4.15-5.073a.5.5 0 0 1 .704-.07"/>
                 </svg>
               </button>
               <button class="account-icon-slot" id="dataBtn" aria-label="Data">
@@ -41,12 +39,9 @@
 
         <aside class="overlay-panel glass slide-in-left">
           <div class="chat-boundary">
-
             <div class="chat-header">
               <div class="chat-header-left">
-                <img src="flightbot-logo-text.png" style="height: 60px; width: auto;"alt="FlightGPT Logo" class="chat-logo"/>
-              </div>
-              <div class="chat-header-right">
+                <img src="flightbot-logo-text.png" style="height: 60px; width: auto;" alt="FlightGPT Logo" class="chat-logo"/>
               </div>
             </div>
 
@@ -77,10 +72,6 @@
               </div>
             </div>
 
-            <div id="layerSwitcher" class="layer-switcher glass is-hidden" aria-label="Layer-Auswahl" style="margin:10px 0;">
-              <div class="layer-switcher-list" id="layerSwitcherList"></div>
-            </div>
-
             <div class="chat-input-boundary">
               <div class="chat-input">
                 <div id="chatLoading" class="loading-indicator" hidden>
@@ -100,41 +91,43 @@
                 </label>
                 <span class="reasoning-toggle-label" id="reasoningLabel">Reasoning</span>
               </div>
-              
-              <div class="chat-input-extras"></div>
-            </div>
-              <div class="chat-input-extras">
-              </div>
             </div>
           </div>
         </aside>
 
         <aside id="dataPanel" class="data-panel glass fade-in-down is-hidden" aria-label="Tabular Data">
-        <div class="data-boundary">
-          <div class="data-header">
-            <div class="data-header-left">
-              <p class="data-header-title">Data Tab</p>
+          <div class="data-boundary">
+            <div class="data-header">
+              <div class="data-header-left">
+                <p class="data-header-title">Data Tab</p>
+              </div>
+              <div class="data-header-right">
+                <button id="dataPanelClose" type="button" class="data-header-close" title="Close" aria-label="Close data panel">✕</button>
+              </div>
             </div>
-            <div class="data-header-right">
-              <button id="dataPanelClose"
-                      type="button"
-                      class="data-header-close"
-                      title="Close"
-                      aria-label="Close data panel">
-                ✕
-              </button>
+            <div class="data-body">
+              <div id="dataPanelTableWrapper" class="data-table-wrapper"></div>
             </div>
           </div>
-
-          <div class="data-body">
-            <div id="dataPanelTableWrapper" class="data-table-wrapper">
-            </div>
-          </div>
-        </div>
-      </aside>
-
+        </aside>
       </div>
     </div>
   </div>
+  
+  <aside id="kpiPanel" class="kpi-panel glass fade-in-down is-hidden" aria-label="KPI Statistics">
+    <div class="data-boundary">
+      <div class="data-header">
+        <div class="data-header-left">
+          <p class="data-header-title">Statistics</p>
+        </div>
+        <div class="data-header-right">
+          <button id="kpiPanelClose" type="button" class="data-header-close" title="Close" aria-label="Close KPI panel">✕</button>
+        </div>
+      </div>
+      <div class="kpi-body">
+        <div id="kpiPanelWrapper" class="kpi-wrapper"></div>
+      </div>
+    </div>
+  </aside>
 </body>
 </html>

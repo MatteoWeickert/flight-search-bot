@@ -6,6 +6,11 @@ let resultLayer = null;
 const messages = [];
 let nextMessageId = 1;
 
+const kpiBtn = document.getElementById("kpiBtn");
+const kpiPanel = document.getElementById("kpiPanel");
+const kpiPanelWrapper = document.getElementById("kpiPanelWrapper");
+const kpiPanelClose = document.getElementById("kpiPanelClose");
+
 const dataBtn = document.getElementById("dataBtn");
 const dataPanel = document.getElementById("dataPanel");
 const dataPanelWrapper = document.getElementById("dataPanelTableWrapper");
@@ -16,6 +21,12 @@ const filterButtons = document.querySelectorAll('.filter-btn');
 
 const reasoningToggle = document.getElementById('reasoningToggle');
 const reasoningLabel = document.getElementById('reasoningLabel');
+
+// Ensure panels are hidden on load
+document.addEventListener('DOMContentLoaded', () => {
+  if (kpiPanel) kpiPanel.classList.add('is-hidden');
+  if (dataPanel) dataPanel.classList.add('is-hidden');
+});
 
 reasoningToggle.addEventListener('change', () => {
   console.log('Reasoning enabled:', reasoningToggle.checked);
@@ -102,8 +113,6 @@ function appendMessage(role, text, reasoningText = null) {
   bubble.appendChild(textContent);
 
   if (reasoningText && reasoningText.trim()) {
-    console.log("[DEBUG] Adding reasoning:", reasoningText);
-    
     const reasoningWrapper = document.createElement("div");
     reasoningWrapper.className = "reasoning-wrapper";
     reasoningWrapper.style.marginTop = "8px";
@@ -118,35 +127,9 @@ function appendMessage(role, text, reasoningText = null) {
       </svg>
       <span>Show reasoning</span>
     `;
-    toggleBtn.style.cssText = `
-      appearance: none;
-      border: 0;
-      background: rgba(0, 136, 221, 0.08);
-      color: #0088dd;
-      padding: 4px 8px;
-      border-radius: 6px;
-      font-size: 11px;
-      font-weight: 500;
-      cursor: pointer;
-      display: flex;
-      align-items: center;
-      gap: 4px;
-      transition: all 0.2s ease;
-    `;
 
     const reasoningContent = document.createElement("div");
     reasoningContent.className = "reasoning-content";
-    reasoningContent.style.cssText = `
-      max-height: 0;
-      overflow: hidden;
-      transition: max-height 0.3s ease;
-      margin-top: 6px;
-      padding: 0;
-      font-size: 11px;
-      color: #4a4a4a;
-      opacity: 0.85;
-      line-height: 1.4;
-    `;
     reasoningContent.textContent = reasoningText;
 
     let isOpen = false;
@@ -167,19 +150,9 @@ function appendMessage(role, text, reasoningText = null) {
       }
     });
 
-    toggleBtn.addEventListener("mouseenter", () => {
-      toggleBtn.style.background = "rgba(0, 136, 221, 0.15)";
-    });
-
-    toggleBtn.addEventListener("mouseleave", () => {
-      toggleBtn.style.background = "rgba(0, 136, 221, 0.08)";
-    });
-
     reasoningWrapper.appendChild(toggleBtn);
     reasoningWrapper.appendChild(reasoningContent);
     bubble.appendChild(reasoningWrapper);
-  } else {
-    console.log("[DEBUG] No reasoning text provided"); // Debug log
   }
 
   wrap.appendChild(bubble);
@@ -187,10 +160,30 @@ function appendMessage(role, text, reasoningText = null) {
   chatHistoryEl.scrollTop = chatHistoryEl.scrollHeight;
 }
 
-
 function setLoading(v) {
   loading.hidden = !v;
   sendBtn.disabled = v;
+  if (!v) {
+    updateLoadingStatus(""); // Clear text when done
+  }
+}
+
+function updateLoadingStatus(text) {
+  const loadingIndicator = document.getElementById("chatLoading");
+  if (!loadingIndicator) return;
+  
+  let statusSpan = document.getElementById("loadingStatusText");
+  
+  // Erstelle das Element, falls es noch nicht existiert
+  if (!statusSpan) {
+    statusSpan = document.createElement("span");
+    statusSpan.id = "loadingStatusText";
+    statusSpan.className = "loading-status-text";
+    // Einfügen VOR dem Spinner
+    loadingIndicator.insertBefore(statusSpan, loadingIndicator.firstChild); 
+  }
+  
+  statusSpan.textContent = text;
 }
 
 function autosize() {
@@ -203,11 +196,6 @@ async function sendMessage() {
   const text = (chatInput.value || "").trim();
   if (!text) return;
 
-  console.log("[JS] Sende Nachricht:", text);
-  console.log("[JS] Active filters:", Array.from(filterState));
-  console.log("[JS] Reasoning enabled:", reasoningToggle.checked);
-
-  // save user message in the requested structure and keep as variable
   const savedMessage = [messages.length > 0, [nextMessageId, String(text)]];
   messages.push(savedMessage);
   nextMessageId += 1;
@@ -230,22 +218,56 @@ async function sendMessage() {
       }),
     });
 
-    const data = await res.json();
-    
-    const chatText = data.chat_text || "Keine Antwort";
-    const reasoningSummary = data.reasoning_summary || null;
-    const mapData = data.map;
-    const tableHtml = data.table_html;
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder("utf-8");
+    let buffer = "";
 
-    appendMessage("bot", chatText, reasoningSummary);
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
 
-    if (tableHtml) {
-      showTablePanel(tableHtml);
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split("\n");
+      buffer = lines.pop(); // Keep partial line
+
+      for (const line of lines) {
+        if (!line.trim()) continue;
+        try {
+          const json = JSON.parse(line);
+
+          if (json.type === "status") {
+            updateLoadingStatus(json.msg);
+          } 
+          else if (json.type === "result") {
+            const data = json.data;
+            const chatText = data.chat_text || "Keine Antwort";
+            const reasoningSummary = data.reasoning_summary || null;
+            const mapData = data.map;
+            const tableHtml = data.table_html;
+            const kpiHtml = data.kpi_html;
+
+            appendMessage("bot", chatText, reasoningSummary);
+
+            if (tableHtml && tableHtml.trim()) {
+              showTablePanel(tableHtml);
+            }
+            if (kpiHtml && kpiHtml.trim()) {
+              showKpiPanel(kpiHtml);
+            }
+            if (mapData && mapData.features && mapData.features.length > 0) {
+              displayOnMap(mapData);
+            }
+          }
+          else if (json.type === "error") {
+            console.error("Backend Error:", json.message);
+            appendMessage("bot", "An error occurred: " + json.message);
+          }
+        } catch (e) {
+          console.warn("JSON Parse error", e);
+        }
+      }
     }
 
-    if (mapData && mapData.features && mapData.features.length > 0) {
-      displayOnMap(mapData);
-    }
   } catch (err) {
     console.error("[JS] Fetch Error:", err);
     appendMessage(
@@ -269,21 +291,15 @@ chatInput.addEventListener("keydown", (e) => {
 });
 
 function displayOnMap(geojson) {
-  console.log("Map data received:", geojson);
   const view = window.view;
   const GraphicsLayer = window.GraphicsLayer;
   const Graphic = window.Graphic;
 
-  if (!view || !view.map || !GraphicsLayer || !Graphic) {
-    console.warn("ArcGIS view or classes not available");
-    return;
-  }
+  if (!view || !view.map || !GraphicsLayer || !Graphic) return;
 
   const features = (geojson && geojson.features) || [];
   if (!features.length) {
-    if (resultLayer) {
-      resultLayer.removeAll();
-    }
+    if (resultLayer) resultLayer.removeAll();
     return;
   }
 
@@ -326,9 +342,7 @@ function displayOnMap(geojson) {
         };
       }
 
-      if (!geometry) {
-        return null;
-      }
+      if (!geometry) return null;
 
       return new Graphic({
         geometry,
@@ -338,10 +352,7 @@ function displayOnMap(geojson) {
     })
     .filter((gr) => gr && gr.geometry);
 
-  if (!graphics.length) {
-    return;
-  }
-
+  if (!graphics.length) return;
   resultLayer.addMany(graphics);
 }
 
@@ -356,6 +367,31 @@ function hideTablePanel() {
   dataPanel.classList.add("is-hidden");
 }
 
+function showKpiPanel(html) {
+  if (!kpiPanel || !kpiPanelWrapper) return;
+  kpiPanelWrapper.innerHTML = html || "";
+  kpiPanel.classList.remove("is-hidden");
+}
+
+function hideKpiPanel() {
+  if (!kpiPanel) return;
+  kpiPanel.classList.add("is-hidden");
+}
+
+if (kpiBtn) {
+  kpiBtn.addEventListener("click", () => {
+    if (!kpiPanel) return;
+    kpiPanel.classList.toggle("is-hidden");
+  });
+}
+
+if (kpiPanelClose) {
+  kpiPanelClose.addEventListener("click", (e) => {
+    e.stopPropagation();
+    hideKpiPanel();
+  });
+}
+
 if (dataBtn) {
   dataBtn.addEventListener("click", () => {
     if (!dataPanel) return;
@@ -364,7 +400,10 @@ if (dataBtn) {
 }
 
 if (dataPanelClose) {
-  dataPanelClose.addEventListener("click", hideTablePanel);
+  dataPanelClose.addEventListener("click", (e) => {
+    e.stopPropagation();
+    hideTablePanel();
+  });
 }
 
 autosize();
