@@ -94,7 +94,7 @@ button:focus-visible,textarea:focus-visible{
 
 
 .chat-history{
-  flex:1;min-height:70%;max-height:unset;
+  flex:1;min-height:0;
   overflow:auto;padding:12px 8px 0 8px;border-radius:12px;
   display:flex;flex-direction:column;gap:8px
 }
@@ -397,10 +397,14 @@ button:focus-visible,textarea:focus-visible{
   }
 }
 
+.chat-filters-wrapper {
+  flex-shrink: 0;
+  padding: 0 8px;
+}
+
 .filter-buttons {
   display: flex;
   gap: 8px;
-  margin-top: 10px;
   flex-wrap: wrap;
 }
 
@@ -572,24 +576,31 @@ button:focus-visible,textarea:focus-visible{
 
 .chat-input-boundary {
   position: relative;
-  flex: 1;
+  flex-shrink: 0;
+  flex-grow: 0;
   background: rgba(0, 0, 0, 0.02);
   border: 1px solid rgba(0, 0, 0, 0.12);
   border-radius: 12px;
-  padding: 6px 10px;
+  padding: 12px;
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 10px;
+}
+
+.loading-area {
+  min-height: 36px;
+  display: flex;
+  align-items: center;
 }
 
 .loading-indicator {
-  position: absolute;
-  left: 10px;
-  top: 12px;
   display: flex;
   align-items: center;
   gap: 8px;
-  z-index: 1;
+  padding: 4px 0;
+  font-size: 12px;
+  color: var(--accent);
+  width: 100%;
 }
 
 .loading-indicator[hidden] {
@@ -623,13 +634,14 @@ button:focus-visible,textarea:focus-visible{
   flex: 1;
   min-height: 20px;
   max-height: 100px;
+  height: 36px;
   resize: none;
   background: transparent;
   border: 0;
   color: var(--fg-0);
   font: inherit;
   line-height: 1.35;
-  padding: 8px 6px 8px 28px;
+  padding: 8px 10px;
 }
 
 .chat-input-field::placeholder {
@@ -668,10 +680,13 @@ button:focus-visible,textarea:focus-visible{
 .reasoning-toggle-wrapper {
   display: flex;
   align-items: center;
-  margin-top: -30px;
   gap: 6px;
-  padding: 0 4px 2px 4px;
+  padding: 4px 4px 0 4px;
   align-self: flex-start;
+  border-top: 1px solid rgba(0, 0, 0, 0.06);
+  margin-top: 4px;
+  padding-top: 8px;
+  width: 100%;
 }
 
 .reasoning-toggle {

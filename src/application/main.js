@@ -169,21 +169,10 @@ function setLoading(v) {
 }
 
 function updateLoadingStatus(text) {
-  const loadingIndicator = document.getElementById("chatLoading");
-  if (!loadingIndicator) return;
-  
-  let statusSpan = document.getElementById("loadingStatusText");
-  
-  // Erstelle das Element, falls es noch nicht existiert
-  if (!statusSpan) {
-    statusSpan = document.createElement("span");
-    statusSpan.id = "loadingStatusText";
-    statusSpan.className = "loading-status-text";
-    // Einfügen VOR dem Spinner
-    loadingIndicator.insertBefore(statusSpan, loadingIndicator.firstChild); 
+  const statusSpan = document.getElementById("loadingStatusText");
+  if (statusSpan) {
+    statusSpan.textContent = text;
   }
-  
-  statusSpan.textContent = text;
 }
 
 function autosize() {
