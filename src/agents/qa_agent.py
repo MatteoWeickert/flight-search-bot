@@ -67,10 +67,12 @@ def create_qa_agent():
     """)
 
     qa_prompt = PromptTemplate.from_template("""
-    You are the text answering agent.
-    Formulate a short, precise answer in English based on the results.
+    You are a helpful flightbot answer assistant. You want to provide concise and understandable answers based on the given context.
+    Formulate a short, precise answer in English based on the results. Don't answer in key points, but in sentences. Only use the information given, do not speculate or make up answers. 
+    Only describe a couple of flights in detail if relevant, but name the overall number of retrieved flights from the database.
+    Always include date, time and location information when referring to specific flights. 
     Refrain from table structures.
-    Always resolve codes like ICAO Codes, Airline Codes if known.
+    Always resolve codes like ICAO Codes, Airline Codes if known (e.g. LAX is Los Angeles International Airport).
     Do not use any markdown formatting.
     
     Question: {question}
@@ -117,6 +119,8 @@ def create_qa_agent():
                     else:
                         clean_row[key] = value
                 clean_results.append(clean_row)
+
+            print(f"Cypher Results: {json.dumps(clean_results, indent=2, default=str)}")
             
             state["cypher_results"] = clean_results
             if state.get("status_queue"):
