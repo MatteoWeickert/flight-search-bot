@@ -35,10 +35,10 @@ def create_map_agent():
     3. IF 'ot' in filters → Display other relevant spatial data
 
     CRITICAL COORDINATE RULES:
-    - Neo4j trajectory arrays: [[Lat, Lon, Alt, Timestamp], ...]
-    - REQUIRED Output: [Longitude, Latitude] (swap order!)
+    - Neo4j trajectory_array: [[Lon, Lat, Flight Level, Timestamp], ...]
+    - REQUIRED Output: [Longitude, Latitude]
     - Remove altitude and timestamp.
-    - Example Input: [50.86, 7.14, 123, "2024-01-01"]
+    - Example Input: [7.14, 50.86, 123, "2024-01-01"]
     - Output: [7.14, 50.86]
 
     OUTPUT STRUCTURE:

@@ -145,10 +145,16 @@ def create_qa_agent():
         geojson = state.get("geojson_input", {})
         if state.get("status_queue"):
             state["status_queue"].put({"type": "status", "msg": "Performing spatial geometry analysis..."})
-
-        flights = process_geojson_input(geojson)
-        state["cypher_results"] = flights
-
+        try:
+            flights = process_geojson_input(geojson)
+            state["cypher_results"] = flights
+            state["cypher_query"] = "Spatial GeoJSON Input Processed"
+        except Exception as e:
+            print(f"Error processing GeoJSON input: {e}")
+            flights = []
+            state["cypher_results"] = []
+            state["text_answer"] = "There was an error processing the uploaded GeoJSON data."
+        
         if not state["query"]:
             state["query"] = "Which flights are passing through the uploaded area?"
             
@@ -165,8 +171,8 @@ def create_qa_agent():
         answer = llm.invoke(prompt).content
         state["text_answer"] = answer
         return state
-    
-    def determine_entry_point(state: QAState) -> str:
+        
+    def route_start(state: QAState) -> str:
         if state.get("geojson_input"):
             return "execute_spatial_search"
         return "generate_cypher"
@@ -177,7 +183,7 @@ def create_qa_agent():
     workflow.add_node("execute_spatial_search", execute_spatial_search)
     workflow.add_node("generate_answer", generate_answer)
     workflow.set_conditional_entry_point(
-        determine_entry_point,
+        route_start,
         {
             "execute_spatial_search": "execute_spatial_search",
             "generate_cypher": "generate_cypher"
@@ -185,7 +191,7 @@ def create_qa_agent():
     )
     workflow.add_edge("generate_cypher", "execute_cypher")
     workflow.add_edge("execute_cypher", "generate_answer")
-    workflow.add_edge("execute_spatial_search", "generate_answer")
+    workflow.add_edge("execute_spatial_search", "generate_answer")    
     workflow.add_edge("generate_answer", END)
 
     return workflow.compile()

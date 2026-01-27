@@ -181,6 +181,9 @@ def retrieve_flights_within_geojson(geojson_data: dict, flights: List[dict]) -> 
     // Wir holen uns auch Start- und Ziel-Flughafen Infos dazu
     OPTIONAL MATCH (f)-[:DEPARTED_FROM]->(dep:Airport)
     OPTIONAL MATCH (f)-[:ARRIVED_AT]->(arr:Airport)
+    OPTIONAL MATCH (f)-[:HAS_POINT]->(p:TrajectoryPoint)
+    WITH f, dep, arr, p ORDER BY p.seq ASC
+
     
     RETURN f.id AS flight_id,
            f.callsign AS callsign,
@@ -191,7 +194,8 @@ def retrieve_flights_within_geojson(geojson_data: dict, flights: List[dict]) -> 
            dep.lat AS origin_lat,
            dep.lon AS origin_lon,
            arr.lat AS dest_lat,
-           arr.lon AS dest_lon
+           arr.lon AS dest_lon,
+           collect([p.lon, p.lat, p.fl, p.time]) AS trajectory_array
     """
     
     params = {"flight_ids": matching_ids}
