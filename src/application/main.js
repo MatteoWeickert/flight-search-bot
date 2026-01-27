@@ -138,8 +138,9 @@ require([
   "esri/Map",
   "esri/views/MapView",
   "esri/layers/GraphicsLayer",
+  "esri/layers/FeatureLayer",
   "esri/Graphic"
-], function (Map, MapView, GraphicsLayer, Graphic) {
+], function (Map, MapView, GraphicsLayer, FeatureLayer, Graphic) {
   const map = new Map({
     basemap: "satellite"
   });
@@ -148,11 +149,15 @@ require([
     container: "map",
     map: map,
     center: [11.5, 48.9],
-    zoom: 6
+    zoom: 6,
+    popup: {
+        defaultPopupTemplateEnabled: true // fallback
+    }
   });
 
   window.view = view;
   window.GraphicsLayer = GraphicsLayer;
+  window.FeatureLayer = FeatureLayer; // Expose to window
   window.Graphic = Graphic;
   view.ui.components = [];
 });
@@ -392,93 +397,115 @@ chatInput.addEventListener("keydown", (e) => {
   }
 });
 
-function displayOnMap(geojson) {
+// GLOBAL VARIABLES FOR LAYERS
+let pointFeatureLayer = null;
+let lineFeatureLayer = null;
+
+function displayOnMap(data) {
   const view = window.view;
-  const GraphicsLayer = window.GraphicsLayer;
+  const FeatureLayer = window.FeatureLayer;
   const Graphic = window.Graphic;
 
-  if (!view || !view.map || !GraphicsLayer || !Graphic) return;
+  if (!view || !view.map || !FeatureLayer || !Graphic) return;
 
-  const features = (geojson && geojson.features) || [];
-  if (!features.length) {
-    if (resultLayer) resultLayer.removeAll();
-    return;
+  // Clear existing layers if they exist
+  if (pointFeatureLayer) {
+    view.map.remove(pointFeatureLayer);
+    pointFeatureLayer = null;
+  }
+  if (lineFeatureLayer) {
+    view.map.remove(lineFeatureLayer);
+    lineFeatureLayer = null;
   }
 
-  if (!resultLayer) {
-    resultLayer = new GraphicsLayer({ id: "llm-results" });
-    view.map.add(resultLayer);
-  } else {
-    resultLayer.removeAll();
-  }
-
-  const graphics = features
-    .map((f) => {
-      const g = f.geometry || {};
-      const coords = g.coordinates || [];
-      let geometry = null;
-      let symbol = null;
-
-      if (g.type === "Point" && coords.length >= 2) {
-        geometry = {
-          type: "point",
-          longitude: coords[0],
-          latitude: coords[1],
-        };
-        symbol = {
-          type: "simple-marker",
-          color: "cyan",
-          size: 8,
-          outline: { color: "black", width: 1 },
-        };
-      }
-      else if (g.type === "LineString" && coords.length >= 2) {
-        geometry = {
-          type: "polyline",
-          paths: coords.map((c) => [c[0], c[1]]),
-        };
-        symbol = {
-          type: "simple-line",
-          color: "cyan",
-          width: 2,
-        };
-      }
-      else if (g.type === "Polygon" && coords.length) {
-        // coords is an array of linear rings
-        geometry = {
-          type: "polygon",
-          rings: coords.map(r => r.map(c => [c[0], c[1]]))
-        };
-        symbol = {
-          type: "simple-fill",
-          color: [0, 200, 200, 0.2],
-          outline: { color: "cyan", width: 2 }
-        };
-      }
-      else if (g.type === "MultiPolygon" && coords.length) {
-        // coords is an array of polygons -> flatten rings
-        const rings = [];
-        coords.forEach(polygon => {
-          polygon.forEach(ring => rings.push(ring.map(c => [c[0], c[1]])));
-        });
-        geometry = { type: "polygon", rings };
-        symbol = { type: "simple-fill", color: [0,200,200,0.18], outline: { color: "cyan", width: 2 } };
-      }
-
-      if (!geometry) return null;
-
+  // 1. Handle Points (Airports/Nodes)
+  if (data.points && data.points.length > 0) {
+    const pointGraphics = data.points.map((pt, index) => {
       return new Graphic({
-        geometry,
-        symbol,
-        attributes: f.properties || {},
+        geometry: pt.geometry,
+        attributes: {
+          ObjectID: index,
+          ...pt.attributes
+        }
       });
-    })
-    .filter((gr) => gr && gr.geometry);
+    });
 
-  if (!graphics.length) return;
-  resultLayer.addMany(graphics);
+    pointFeatureLayer = new FeatureLayer({
+      source: pointGraphics,
+      objectIdField: "ObjectID",
+      fields: [
+        { name: "ObjectID", alias: "ObjectID", type: "oid" },
+        { name: "name", alias: "Name", type: "string" },
+        { name: "type", alias: "Type", type: "string" },
+        { name: "desc", alias: "Description", type: "string" },
+        { name: "id", alias: "ID", type: "string" }
+      ],
+      popupTemplate: {
+        title: "{name}",
+        content: [
+          {
+            type: "fields",
+            fieldInfos: [
+              { fieldName: "type", label: "Category" },
+              { fieldName: "desc", label: "Details" },
+              { fieldName: "id", label: "Code" }
+            ]
+          }
+        ]
+      },
+      renderer: {
+        type: "simple",
+        symbol: {
+          type: "simple-marker",
+          color: [255, 77, 109, 0.9], // Pink/Red for airports
+          size: "10px",
+          outline: { color: [255, 255, 255, 0.8], width: 1 }
+        }
+      }
+    });
+
+    view.map.add(pointFeatureLayer);
+  }
+
+  // 2. Handle Lines (Trajectories)
+  if (data.lines && data.lines.length > 0) {
+    const lineGraphics = data.lines.map((ln, index) => {
+      return new Graphic({
+        geometry: ln.geometry,
+        attributes: {
+          ObjectID: index,
+          ...ln.attributes
+        }
+      });
+    });
+
+    lineFeatureLayer = new FeatureLayer({
+      source: lineGraphics,
+      objectIdField: "ObjectID",
+      fields: [
+        { name: "ObjectID", alias: "ObjectID", type: "oid" },
+        { name: "name", alias: "Flight", type: "string" },
+        { name: "type", alias: "Type", type: "string" },
+        { name: "desc", alias: "Info", type: "string" },
+        { name: "id", alias: "ID", type: "string" }
+      ],
+      popupTemplate: {
+        title: "{name}",
+        content: "{desc}" 
+      },
+      renderer: {
+        type: "simple",
+        symbol: {
+          type: "simple-line",
+          color: [0, 200, 255, 0.8], // Cyan for flights
+          width: 2.5
+        }
+      }
+    });
+
+    view.map.add(lineFeatureLayer);
+  }
 }
-
 // Show uploaded polygon(s) on a separate layer and zoom to it
 function showUploadedGeojson(geojson) {
   const view = window.view;
