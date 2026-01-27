@@ -213,19 +213,3 @@ def process_geojson_input(geojson_data: dict) -> List[str]:
     flights_in_firs = retrieve_flights_passing_FIRs(matching_fir_ids)
     matching_flights = retrieve_flights_within_geojson(geojson_data, flights_in_firs)
     return matching_flights
-  
-
-
-
-if __name__ == "__main__":
-    
-    user_geojson = {"type":"FeatureCollection",
-    "features":[{
-    "type":"Feature",
-    "properties":{},
-    "geometry":
-        {"coordinates":[[[7.27208601928433,50.87049645110096],[9.147992983963178,50.095151256459815],[11.128119323399915,51.10262956912629],[7.7851500621682135,51.76237796536631],[6.422259324139475,51.53854941032171],[6.109603606724164,51.14793906138044],[6.478398929435599,51.03211869804241],[7.27208601928433,50.87049645110096]]],
-        "type":"Polygon"}}]}
-    
-    matching_flights = process_geojson_input(user_geojson)
-    print(f"Gefundene Flüge: {json.dumps(matching_flights, indent=2, default=str)}")

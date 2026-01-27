@@ -7,6 +7,7 @@ from langgraph.graph import StateGraph, END
 from typing import TypedDict, List, Any
 import ast
 import json
+from utils.geojson_input import retrieve_FIRs_as_geoJSON, calculate_matching_FIR_to_geojson, retrieve_flights_passing_FIRs, retrieve_flights_within_geojson, process_geojson_input
 
 load_dotenv()
 
@@ -18,6 +19,7 @@ class QAState(TypedDict):
     schema: str
     filters: List[str]
     status_queue: Any
+    geojson_input: Any
 
 def create_qa_agent():
     llm = ChatOpenAI(
@@ -131,6 +133,19 @@ def create_qa_agent():
             state["cypher_results"] = []
             
         return state
+    
+    def execute_spatial_search(state: QAState) -> QAState:
+        geojson = state.get("geojson_input", {})
+        if state.get("status_queue"):
+            state["status_queue"].put({"type": "status", "msg": "Performing spatial geometry analysis..."})
+
+        flights = process_geojson_input(geojson)
+        state["cypher_results"] = flights
+
+        if not state["query"]:
+            state["query"] = "Which flights are passing through the uploaded area?"
+            
+        return state
 
     def generate_answer(state: QAState) -> QAState:
         if state.get("status_queue"):
@@ -143,14 +158,27 @@ def create_qa_agent():
         answer = llm.invoke(prompt).content
         state["text_answer"] = answer
         return state
+    
+    def determine_entry_point(state: QAState) -> str:
+        if state.get("geojson_input"):
+            return "execute_spatial_search"
+        return "generate_cypher"
 
     workflow = StateGraph(QAState)
     workflow.add_node("generate_cypher", generate_cypher)
     workflow.add_node("execute_cypher", execute_cypher)
+    workflow.add_node("execute_spatial_search", execute_spatial_search)
     workflow.add_node("generate_answer", generate_answer)
-    workflow.set_entry_point("generate_cypher")
+    workflow.set_conditional_entry_point(
+        determine_entry_point,
+        {
+            "execute_spatial_search": "execute_spatial_search",
+            "generate_cypher": "generate_cypher"
+        }
+    )
     workflow.add_edge("generate_cypher", "execute_cypher")
     workflow.add_edge("execute_cypher", "generate_answer")
+    workflow.add_edge("execute_spatial_search", "generate_answer")
     workflow.add_edge("generate_answer", END)
 
     return workflow.compile()

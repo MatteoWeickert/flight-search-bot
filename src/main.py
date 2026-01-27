@@ -20,6 +20,8 @@ def chat():
     filters = data.get("filters", [])
     if not isinstance(filters, list):
         filters = []
+
+    geojson_input = data.get("geojsonInput", None)
     
     reasoning = data.get("reasoning", True)
     messages = data.get("messages", [])
@@ -31,7 +33,7 @@ def chat():
 
     def task():
         try:
-            reply = process_query(msg, filters, reasoning, messages, status_queue)
+            reply = process_query(msg, filters, reasoning, messages, status_queue, geojson_input)
             status_queue.put({"type": "result", "data": reply})
         finally:
             status_queue.put(None)

@@ -321,7 +321,8 @@ async function sendMessage() {
         saved_message: savedMessage,
         messages: messages,
         filters: Array.from(filterState),
-        reasoning: reasoningToggle.checked
+        reasoning: reasoningToggle.checked,
+        geojsonInput: uploadedGeojson || null
       }),
     });
 

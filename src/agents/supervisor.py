@@ -18,6 +18,7 @@ class SupervisorState(TypedDict):
     query: str
     filters: List[str]
     reasoning: bool
+    geojson_input: Any
     agents_to_call: List[str]
     reasoning_summary: str
     cypher_query: str
@@ -106,6 +107,13 @@ def create_supervisor():
         return state
 
     def route_query(state: SupervisorState) -> SupervisorState:
+
+        if state.get("geojson_input"):
+            state["agents_to_call"] = ["qa", "map", "table"]
+            if not state["query"]:
+                state["query"] = "Which flights are passing through the uploaded area?"
+                return state
+            
         prompt = routing_prompt.format(
             query=state["query"],
             filters=state["filters"],
@@ -131,6 +139,7 @@ def create_supervisor():
                 agents.append("table")
         
         if "qa" not in agents: agents.insert(0, "qa")
+
         state["agents_to_call"] = agents
         return state
 
@@ -154,7 +163,8 @@ def create_supervisor():
         result = qa_agent.invoke({
             "query": state["query"], 
             "filters": state["filters"],
-            "status_queue": state.get("status_queue")
+            "status_queue": state.get("status_queue"),
+            "geojson_input": state.get("geojson_input", {})
         })
         state["text_answer"] = result["text_answer"]
         state["cypher_query"] = result["cypher_query"]
@@ -221,9 +231,10 @@ def create_supervisor():
 
 supervisor = create_supervisor()
 
-def process_query(query: str, filters: list = None, reasoning: bool = False, messages: list = None, status_queue = None) -> dict:
+def process_query(query: str, filters: list = None, reasoning: bool = False, messages: list = None, status_queue = None, geojson_input = None) -> dict:
     if filters is None: filters = []
     if messages is None: messages = []
+    if geojson_input is None: geojson_input = {}
 
     initial_state = {
         "query": query,
@@ -238,7 +249,8 @@ def process_query(query: str, filters: list = None, reasoning: bool = False, mes
         "table_output": "",
         "kpi_output": "", 
         "messages": messages,
-        "status_queue": status_queue
+        "status_queue": status_queue,
+        "geojson_input": geojson_input
     }
 
     try:
