@@ -63,7 +63,7 @@ def create_map_agent():
           "attributes": {{
             "name": "Cologne Bonn Airport",
             "type": "Airport",
-            "desc": "ICAO: EDDK | Hub for Eurowings",
+            "desc": "Latitude: 50.86583, Longitude: 7.14278",
             "id": "EDDK"
           }}
         }}
@@ -75,9 +75,9 @@ def create_map_agent():
             "paths": [[[7.14, 50.86], [8.5, 50.0], [9.2, 48.8]]]
           }},
           "attributes": {{
-            "name": "Flight DLH123",
+            "name": "Cologne Bonn Airport to Copenhagen Airport",
             "type": "Trajectory",
-            "desc": "Altitude: 35000ft | Speed: 450kts",
+            "desc": "Using Aircraft... (insert Aircraft Type or other details)",
             "id": "f_12345"
           }}
         }}

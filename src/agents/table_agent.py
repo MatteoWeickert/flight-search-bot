@@ -36,7 +36,7 @@ def create_table_agent():
     Rules:
     - Output ONLY valid HTML <table>...</table>.
     - Include meaningful headers.
-    - Do not include technical IDs or long coordinate arrays.
+    - Include all data that is provided except long trajectories or coordinates.
     - If empty, return "No data available".
     - Use Bootstrap classes if possible (table table-striped).
     """)
