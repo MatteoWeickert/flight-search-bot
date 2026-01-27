@@ -38,47 +38,54 @@ def create_qa_agent():
     schema_text = graph_db.schema
 
     cypher_prompt = PromptTemplate.from_template("""
-    You are an expert in Cypher and create ONLY a valid Cypher query.
-    Use only labels/properties/relations from this schema:
-    {schema}
-    
-    Be aware that e.g. DEP_AP etc use ICAO Codes and therefore need to be used in the query like that.
-    Always use ICAO Codes when referring to Airports.
-    
-    User filters: {filters}
-    
-    MANDATORY RULES FOR FILTERS:
-    1. If filters list contains 'tj' (Trajectories):
-       - You MUST use: OPTIONAL MATCH (f)-[:has_route]->(tr:Trajectory)
-       - You MUST return: tr.trajectory_array
-    
-    2. If filters list contains 'ap' (Airports):
-       - You MUST return latitude/longitude for both Departure and Arrival airports (DEP_AP_LAT, DEP_AP_LON, etc.)
-    
-    3. If filters list contains 'ot' (others):
-       - Be creative in what to include on the map.
-       
-    4. If filters list is empty:
-       - Anticipate spatial data if relevant (trajectories or airports).
+        You are an expert in Cypher and create ONLY a valid Cypher query.
+        Use only labels/properties/relations from this schema:
+        {schema}
+        
+        Be aware that e.g. DEP_AP etc use ICAO Codes and therefore need to be used in the query like that.
+        Always use ICAO Codes when referring to Airports.
+        When referring to Airlines, use their standard codes (e.g. DLH for Lufthansa).
+        When referring to Aircrafts, use their professional code i.e. A388 when referring to an Airbus A380-800.
+        
+        User filters: {filters}
+        
+        MANDATORY RULES FOR FILTERS:
+        1. If filters list contains 'tj' (Trajectories):
+        - You MUST use: OPTIONAL MATCH (f)-[:has_point]->(tr:TrajectoryPoint) (many points per flight)
+        - You MUST sequence the points by their seq stamp: ORDER BY tr.seq_stamp
+        - FEW SHOT EXAMPLE:
+            MATCH (f)-[:HAS_POINT]->(p:TrajectoryPoint)
+            WITH f, p ORDER BY p.seq ASC
+            collect([p.lon, p.lat]) AS trajectory_array
+        - Implement ALL available data inside a point (height, timestamp) inside the trajectory array.
+        
+        2. If filters list contains 'ap' (Airports):
+        - You MUST return latitude/longitude for both Departure and Arrival airports (DEP_AP_LAT, DEP_AP_LON, etc.)
+        
+        3. If filters list contains 'ot' (others):
+        - Be creative in what to include on the map.
+        
+        4. If filters list is empty:
+        - Anticipate spatial data if relevant (trajectories or airports).
 
-    IMPORTANT RULES:
-    - Only use existing Labels/Properties/Relations from the schema.
-    - Return ONLY the Cypher query (no explanations, no markdown).
-    
-    Question: {query}
+        IMPORTANT RULES:
+        - Only use existing Labels/Properties/Relations from the schema.
+        - Return ONLY the Cypher query (no explanations, no markdown).
+        
+        Question: {query}
     """)
 
     qa_prompt = PromptTemplate.from_template("""
-    You are a helpful flightbot answer assistant. You want to provide concise and understandable answers based on the given context.
-    Formulate a short, precise answer in English based on the results. Don't answer in key points, but in sentences. Only use the information given, do not speculate or make up answers. 
-    Only describe a couple of flights in detail if relevant, but name the overall number of retrieved flights from the database.
-    Always include date, time and location information when referring to specific flights. 
-    Refrain from table structures.
-    Always resolve codes like ICAO Codes, Airline Codes if known (e.g. LAX is Los Angeles International Airport).
-    Do not use any markdown formatting.
-    
-    Question: {question}
-    Results: {context}
+        You are a helpful flightbot answer assistant. You want to provide concise and understandable answers based on the given context.
+        Formulate a short, precise answer in English based on the results. Don't answer in key points, but in sentences. Only use the information given, do not speculate or make up answers. 
+        Only describe a couple of flights in detail if relevant, but name the overall number of retrieved flights from the database.
+        Always include date, time and location information when referring to specific flights. 
+        Refrain from table structures.
+        Always resolve codes like ICAO Codes, Airline Codes if known (e.g. LAX is Los Angeles International Airport).
+        Do not use any markdown formatting.
+        
+        Question: {question}
+        Results: {context}
     """)
 
 

@@ -362,7 +362,8 @@ async function sendMessage() {
             if (kpiHtml && kpiHtml.trim()) {
               showKpiPanel(kpiHtml);
             }
-            if (mapData && mapData.features && mapData.features.length > 0) {
+            if (mapData && ((mapData.points && mapData.points.length > 0) || (mapData.lines && mapData.lines.length > 0))) {
+              console.log("Displaying map data:", mapData);
               displayOnMap(mapData);
             }
           }
@@ -422,8 +423,22 @@ function displayOnMap(data) {
   // 1. Handle Points (Airports/Nodes)
   if (data.points && data.points.length > 0) {
     const pointGraphics = data.points.map((pt, index) => {
+      // FIX: Ensure coordinates are [Longitude, Latitude]
+      let geom = pt.geometry;
+      if (geom.latitude && geom.longitude) {
+        // If agent returned { latitude: 50, longitude: 7 }, ArcGIS handles it via key names
+        // But if values are flipped in properties (e.g. lat=7, lon=50), we might need to swap.
+        // Heuristic: For Europe, Lat (50ish) > Lon (7ish). 
+        if (Math.abs(geom.latitude) < Math.abs(geom.longitude) && Math.abs(geom.longitude) > 30) {
+             // Values likely swapped
+             const temp = geom.latitude;
+             geom.latitude = geom.longitude;
+             geom.longitude = temp;
+        }
+      }
+      
       return new Graphic({
-        geometry: pt.geometry,
+        geometry: geom,
         attributes: {
           ObjectID: index,
           ...pt.attributes
@@ -471,8 +486,25 @@ function displayOnMap(data) {
   // 2. Handle Lines (Trajectories)
   if (data.lines && data.lines.length > 0) {
     const lineGraphics = data.lines.map((ln, index) => {
+      let geom = ln.geometry;
+      
+      // FIX: Swap coordinates for paths if necessary [Lat, Lon] -> [Lon, Lat]
+      // Agent output: [50.8, 7.1] (Lat, Lon) -> Needs to be [7.1, 50.8] (Lon, Lat)
+      if (geom.paths && geom.paths.length > 0) {
+        geom.paths = geom.paths.map(path => {
+            return path.map(coord => {
+                // Heuristic: If 1st coord (x) > 2nd coord (y) and we are likely in Europe (x ~ 50),
+                // then x is Latitude. Swap them.
+                if (coord[0] > coord[1] && coord[0] > 30) {
+                    return [coord[1], coord[0]]; // Swap to [Lon, Lat]
+                }
+                return coord;
+            });
+        });
+      }
+
       return new Graphic({
-        geometry: ln.geometry,
+        geometry: geom,
         attributes: {
           ObjectID: index,
           ...ln.attributes
@@ -505,6 +537,29 @@ function displayOnMap(data) {
     });
 
     view.map.add(lineFeatureLayer);
+  }
+  
+  // 3. Zoom to new data
+  const layersToZoom = [];
+  if (pointFeatureLayer) layersToZoom.push(pointFeatureLayer);
+  if (lineFeatureLayer) layersToZoom.push(lineFeatureLayer);
+  
+  if (layersToZoom.length > 0) {
+      // Use queryExtent to find the bounds of client-side features
+      let promises = layersToZoom.map(l => l.queryExtent());
+      Promise.all(promises).then((results) => {
+          let combinedExtent = null;
+          results.forEach(res => {
+              if (res && res.extent) {
+                  if (!combinedExtent) combinedExtent = res.extent.clone();
+                  else combinedExtent.union(res.extent);
+              }
+          });
+          
+          if (combinedExtent) {
+              view.goTo(combinedExtent.expand(1.2)); // Expand by 20% for padding
+          }
+      }).catch(console.error);
   }
 }
 // Show uploaded polygon(s) on a separate layer and zoom to it
