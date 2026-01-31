@@ -46,6 +46,16 @@ def create_qa_agent():
         Always use ICAO Codes when referring to Airports.
         When referring to Airlines, use their standard codes (e.g. DLH for Lufthansa).
         When referring to Aircrafts, use their professional code i.e. A388 when referring to an Airbus A380-800.
+
+        MANDATORY METADATA RULE:
+        Whenever you query a Flight (f:Flight) with a arrival airport (arr_ap:Airport) or departure airport (dep_ap:Airport) in the relation 
+        (f)-[:departed_from]->(dep_ap) or (f)-[:arrived_at]->(arr_ap), you MUST return the following properties if available:
+        - f.id (as id)
+        - f.callsign (as callsign)
+        - dep_ap.code (as origin)
+        - arr_ap.code (as destination)
+        - f.ac_type (as aircraft)
+        - f.operator (as operator)
         
         User filters: {filters}
         
@@ -71,10 +81,26 @@ def create_qa_agent():
         IMPORTANT RULES:
         - Only use existing Labels/Properties/Relations from the schema.
         - Return ONLY the Cypher query (no explanations, no markdown).
+                                                 
+        MANDATORY SPATIAL RULE:
+        If the user wants to see flights, routes, or trajectories:
+        1. You MUST match the Flight and its TrajectoryPoints: (f:Flight)-[:HAS_POINT]->(p:TrajectoryPoint)
+        2. You MUST return ALL metadata AND the trajectory array in the same query.
+        
+        REQUIRED RETURN FORMAT:
+        RETURN 
+            - f.id (as id)
+            - f.callsign (as callsign)
+            - dep_ap.code (as origin)
+            - arr_ap.code (as destination)
+            - f.ac_type (as aircraft)
+            - f.operator (as operator)
+            collect([p.lon, p.lat]) as trajectory_array
+        ORDER BY f.flight_id
         
         Question: {query}
-    """)
-
+    """
+)
     qa_prompt = PromptTemplate.from_template("""
         You are a helpful flightbot answer assistant. You want to provide concise and understandable answers based on the given context.
         Formulate a short, precise answer in English based on the results. Don't answer in key points, but in sentences. Only use the information given, do not speculate or make up answers. 

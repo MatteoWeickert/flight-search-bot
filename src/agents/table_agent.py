@@ -48,14 +48,25 @@ def create_table_agent():
     Query: {query}
     Data: {results_json}
     
+    CRITICAL FORMATTING RULES:
+    1. Keep values SHORT - max 8 characters
+    2. Use abbreviations:
+       - "1.2k" instead of "1,234"
+       - "12.5k" instead of "12,500"
+       - "1.2M" instead of "1,200,000"
+    3. Round numbers: "413" not "413.456"
+    4. Use short time formats: "1h 27m" not "1 hour 27 minutes"
+    5. Percentages: "95%" not "95.456%"
+    6. NEVER use values longer than 8 characters
+    
     EXAMPLES:
     
     Example 1 - Flight Query:
     Input: {{"FILED_ARRIVAL": "01.09.2023 01:35", "DIST_FLOWN": 413, "REQ_FLIGHT_LVL": 320}}
     Output:
     <div class="kpi-grid">
-      <div class="kpi-card"><div class="kpi-value">413</div><div class="kpi-label">Avg Distance (km)</div></div>
-      <div class="kpi-card"><div class="kpi-value">320</div><div class="kpi-label">Avg Flight Level</div></div>
+      <div class="kpi-card"><div class="kpi-value">413 km</div><div class="kpi-label">Avg Distance</div></div>
+      <div class="kpi-card"><div class="kpi-value">FL320</div><div class="kpi-label">Avg Flight Level</div></div>
       <div class="kpi-card"><div class="kpi-value">1h 27m</div><div class="kpi-label">Avg Duration</div></div>
       <div class="kpi-card"><div class="kpi-value">8</div><div class="kpi-label">Total Flights</div></div>
     </div>
@@ -65,18 +76,27 @@ def create_table_agent():
     Output:
     <div class="kpi-grid">
       <div class="kpi-card"><div class="kpi-value">5</div><div class="kpi-label">Total Routes</div></div>
-      <div class="kpi-card"><div class="kpi-value">EDDK</div><div class="kpi-label">Most Common Origin</div></div>
+      <div class="kpi-card"><div class="kpi-value">EDDK</div><div class="kpi-label">Top Origin</div></div>
       <div class="kpi-card"><div class="kpi-value">LFPG</div><div class="kpi-label">Top Destination</div></div>
       <div class="kpi-card"><div class="kpi-value">100%</div><div class="kpi-label">On-Time Rate</div></div>
     </div>
     
+    Example 3 - Large Numbers:
+    Input: {{"total_distance": 1234567, "flights": 12500}}
+    Output:
+    <div class="kpi-grid">
+      <div class="kpi-card"><div class="kpi-value">1.2M km</div><div class="kpi-label">Total Distance</div></div>
+      <div class="kpi-card"><div class="kpi-value">12.5k</div><div class="kpi-label">Total Flights</div></div>
+    </div>
+    
     RULES:
     - Output ONLY HTML with class "kpi-grid" containing 4-6 "kpi-card" divs
-    - Each card has: <div class="kpi-value">NUMBER/TEXT</div> and <div class="kpi-label">DESCRIPTION</div>
+    - Each card has: <div class="kpi-value">SHORT_VALUE</div> and <div class="kpi-label">LABEL</div>
     - Calculate meaningful statistics: totals, averages, min/max, percentages
     - Be creative: derive insights like busiest route, average delay, peak times
-    - Use short labels (max 3-4 words)
-    - Format numbers nicely (e.g., "1,234" not "1234")
+    - Use short labels (max 3 words)
+    - FORMAT ALL NUMBERS TO BE MAX 8 CHARACTERS (use k, M abbreviations)
+    - Add units where helpful (km, h, %, FL)
     - If no data, return: <div class="kpi-grid"><div class="kpi-card"><div class="kpi-value">N/A</div><div class="kpi-label">No Data Available</div></div></div>
     
     Generate KPIs now:

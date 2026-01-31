@@ -45,11 +45,15 @@ def create_map_agent():
     Return a JSON object with two keys: "points" and "lines".
     Each item must have "geometry" and "attributes".
     
-    Standardize Attributes keys for Popups:
-    - 'name': Title of the object (e.g. "Airport Cologne")
-    - 'type': Category (e.g. "Airport", "Flight")
-    - 'desc': Description or details (e.g. "ICAO: EDDK")
-    - 'id': Unique identifier if available
+    Standardize Attributes keys for Popups (CRITICAL):
+    - 'id': Flight callsign or ID
+    - 'type': Set to "Flight" or "Airport"
+    - 'origin': ICAO code of departure
+    - 'destination': ICAO code of arrival
+    - 'aircraft': Aircraft type code
+    - 'operator': Full airline name
+    - 'callsign': callsign
+    Ensure every flight in "lines" has these attributes filled if data is available in Cypher Results.
 
     OUTPUT FORMAT (Few-Shot Example):
     {{
@@ -63,7 +67,6 @@ def create_map_agent():
           "attributes": {{
             "name": "Cologne Bonn Airport",
             "type": "Airport",
-            "desc": "Latitude: 50.86583, Longitude: 7.14278",
             "id": "EDDK"
           }}
         }}
@@ -75,9 +78,12 @@ def create_map_agent():
             "paths": [[[7.14, 50.86], [8.5, 50.0], [9.2, 48.8]]]
           }},
           "attributes": {{
-            "name": "Cologne Bonn Airport to Copenhagen Airport",
-            "type": "Trajectory",
-            "desc": "Using Aircraft... (insert Aircraft Type or other details)",
+            "type": "Flight",
+            "origin": "EDDK",
+            "destination": "EKCH",
+            "aircraft": "A320",
+            "operator": "Lufthansa",
+            "callsign": "DLH456",
             "id": "f_12345"
           }}
         }}
@@ -88,6 +94,8 @@ def create_map_agent():
     - Output ONLY valid JSON (no markdown, no code fences).
     - If no geometry is found for a category, return an empty array [].
     - Ensure coordinates are numbers, not strings.
+    - Keep attributes minimal and structured for clean popups.
+    - Use ICAO codes for airports, not full names in origin/destination.
 
     Cypher Results:
     {results_json}
@@ -107,6 +115,8 @@ def create_map_agent():
         
         prompt = map_prompt.format(results_json=results_json, filters=filters_list)
         map_output = llm.invoke(prompt).content.strip()
+
+        print(f"Map Agent Output: {map_output}")
         
         if map_output.startswith("```"):
             lines = map_output.split("\n")

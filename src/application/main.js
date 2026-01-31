@@ -7,6 +7,48 @@ let uploadLayer = null; // separate layer for user-uploaded polygon
 const messages = [];
 let nextMessageId = 1;
 
+// NEW: Function to clear chat context
+function clearChatContext() {
+  messages.length = 0; // Clear messages array
+  nextMessageId = 1;
+
+  clearMap();
+
+  
+  // Visual feedback
+  const historyEl = document.querySelector('.chat-history');
+  if (historyEl) {
+    // Add fade out animation
+    console.log('Chat context and map cleared');
+    historyEl.style.opacity = '0.5';
+    setTimeout(() => {
+      historyEl.innerHTML = '';
+      historyEl.style.opacity = '1';
+      
+      // Add confirmation message
+      const confirmMsg = document.createElement('div');
+      confirmMsg.style.cssText = `
+        text-align: center;
+        padding: 12px;
+        color: var(--muted);
+        font-size: 12px;
+        font-style: italic;
+      `;
+      confirmMsg.textContent = 'Context cleared - Starting fresh conversation';
+      historyEl.appendChild(confirmMsg);
+      
+      // Remove confirmation after 2 seconds
+      setTimeout(() => {
+        if (historyEl.children.length === 1 && historyEl.children[0] === confirmMsg) {
+          confirmMsg.remove();
+        }
+      }, 2000);
+    }, 200);
+  }
+  
+  console.log('Chat context cleared');
+}
+
 const kpiBtn = document.getElementById("kpiBtn");
 const kpiPanel = document.getElementById("kpiPanel");
 const kpiPanelWrapper = document.getElementById("kpiPanelWrapper");
@@ -26,6 +68,12 @@ const reasoningLabel = document.getElementById('reasoningLabel');
 const uploadBtn = document.getElementById('uploadBtn');
 const geojsonInput = document.getElementById('geojsonInput');
 let uploadedGeojson = null; // will hold the validated geojson for later processing
+
+// NEW: Paging variables
+let allFlightLines = [];
+let currentPage = 0;
+const FLIGHTS_PER_PAGE = 4;
+let pagingControls = null;
 
 // Ensure panels are hidden on load
 document.addEventListener('DOMContentLoaded', () => {
@@ -184,7 +232,11 @@ function appendMessage(role, text, reasoningText = null) {
   }
 
   const textContent = document.createElement("div");
-  textContent.textContent = text;
+  let formattedText = text
+    .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>') // Fett
+    .replace(/\*(.*?)\*/g, '<em>$1</em>')           // Kursiv
+    .replace(/\n/g, '<br>');                         // Zeilenumbrüche
+  textContent.innerHTML = formattedText;
   bubble.appendChild(textContent);
 
   if (reasoningText && reasoningText.trim()) {
@@ -402,15 +454,359 @@ chatInput.addEventListener("keydown", (e) => {
 // GLOBAL VARIABLES FOR LAYERS
 let pointFeatureLayer = null;
 let lineFeatureLayer = null;
+let customPopup = null; // NEW: Custom popup element
+
+// NEW: Create custom popup element
+function createCustomPopup() {
+  if (customPopup) return customPopup;
+  
+  const popup = document.createElement('div');
+  popup.id = 'customFlightPopup';
+  popup.style.cssText = `
+    position: absolute;
+    z-index: 999;
+    display: none;
+    pointer-events: none;
+  `;
+  
+  popup.innerHTML = `
+    <div class="custom-popup-content glass" style="
+      min-width: 240px;
+      max-width: 300px;
+      padding: 16px;
+      border-radius: 12px;
+      box-shadow: 0 12px 40px rgba(0, 0, 0, 0.6);
+      pointer-events: auto;
+      background: rgba(15, 23, 42, 0.95); /* Sehr dunkles Blau, fast deckend */
+      backdrop-filter: blur(10px);
+      border: 1px solid rgba(61, 242, 255, 0.3); /* Cyanfarbener Rand */
+      color: #ffffff; /* Erzwinge weißen Text */
+    ">
+      <div class="popup-close" style="
+        position: absolute;
+        top: 10px;
+        right: 12px;
+        cursor: pointer;
+        color: rgba(255,255,255,0.6);
+        font-size: 20px;
+        line-height: 1;
+        transition: color 0.2s;
+      ">×</div>
+      
+      <div class="popup-route" style="
+        font-size: 16px;
+        font-weight: 800;
+        color: #3df2ff; /* Knalliges Cyan für die Route */
+        margin-bottom: 12px;
+        padding-right: 20px;
+        border-bottom: 1px solid rgba(61, 242, 255, 0.2);
+        padding-bottom: 8px;
+      "></div>
+      
+      <div class="popup-details" style="
+        display: grid;
+        grid-template-columns: auto 1fr;
+        gap: 8px 15px;
+        font-size: 13px;
+      "></div>
+    </div>
+  `;
+  
+  document.body.appendChild(popup);
+  
+  // Close button handler
+  const closeBtn = popup.querySelector('.popup-close');
+  closeBtn.addEventListener('click', () => hideCustomPopup());
+  closeBtn.addEventListener('mouseenter', (e) => {
+    e.target.style.color = 'var(--danger)';
+  });
+  closeBtn.addEventListener('mouseleave', (e) => {
+    e.target.style.color = 'var(--muted)';
+  });
+  
+  customPopup = popup;
+  return popup;
+}
+
+// NEW: Show custom popup
+function showCustomPopup(attributes, screenPoint) {
+  console.log("Popup Attributes received:", attributes); // Debugging: Schau in die Konsole!
+  
+  const popup = createCustomPopup();
+  const routeEl = popup.querySelector('.popup-route');
+  const detailsEl = popup.querySelector('.popup-details');
+  
+  // Header: Zeige Route oder Name
+  if (attributes.origin && attributes.destination && attributes.origin !== "N/A") {
+    routeEl.innerHTML = `<span style="color: var(--accent)">${attributes.origin}</span> → <span style="color: var(--accent)">${attributes.destination}</span>`;
+  } else {
+    routeEl.textContent = attributes.name || attributes.callsign || "Flight Info";
+  }
+  
+  // Details Grid
+  const rows = [
+    { label: "Flight ID", val: attributes.id },
+    { label: "Callsign", val: attributes.callsign },
+    { label: "Operator", val: attributes.operator },
+    { label: "Aircraft", val: attributes.aircraft },
+    { label: "Origin", val: attributes.origin },
+    { label: "Destination", val: attributes.destination }
+  ];
+  
+  let detailsHTML = "";
+  rows.forEach(row => {
+    if (row.val && row.val !== "N/A") {
+      detailsHTML += `
+        <div style="color: rgba(255, 255, 255, 0.5); font-weight: 500;">${row.label}</div>
+        <div style="color: #ffffff; text-align: right; font-weight: 600;">${row.val}</div>
+      `;
+    }
+  });
+  
+  detailsEl.innerHTML = detailsHTML || "<div>No additional data available</div>";
+  
+  // Positionierung
+  popup.style.display = "block";
+  popup.style.left = (screenPoint.x + 15) + "px";
+  popup.style.top = (screenPoint.y - 15) + "px";
+}
+
+// NEW: Hide custom popup
+function hideCustomPopup() {
+  if (customPopup) {
+    customPopup.style.display = 'none';
+  }
+}
+
+// NEW: Generate random vibrant colors for flight trajectories
+function generateFlightColor(index) {
+  const colors = [
+    [0, 200, 255],    // Cyan
+    [255, 77, 109],   // Pink/Red
+    [144, 238, 144],  // Light Green
+    [255, 215, 0],    // Gold
+    [255, 140, 0],    // Dark Orange
+    [147, 112, 219],  // Medium Purple
+    [255, 105, 180],  // Hot Pink
+    [64, 224, 208],   // Turquoise
+    [255, 192, 203],  // Pink
+    [173, 255, 47]    // Green Yellow
+  ];
+  
+  // If more than 10 flights, generate random colors
+  if (index < colors.length) {
+    return colors[index];
+  } else {
+    return [
+      Math.floor(Math.random() * 156) + 100, // 100-255
+      Math.floor(Math.random() * 156) + 100,
+      Math.floor(Math.random() * 156) + 100
+    ];
+  }
+}
+
+// NEW: Create paging controls
+function createPagingControls() {
+  const view = window.view;
+  if (!view) return;
+  
+  // Remove old controls if they exist
+  if (pagingControls) {
+    view.ui.remove(pagingControls);
+  }
+  
+  const totalPages = Math.ceil(allFlightLines.length / FLIGHTS_PER_PAGE);
+  if (totalPages <= 1) {
+    pagingControls = null;
+    return; // No paging needed
+  }
+  
+  const container = document.createElement('div');
+  container.className = 'paging-controls glass';
+  container.style.cssText = `
+    padding: 12px 16px;
+    background: rgba(0, 0, 0, 0.85);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+  `;
+  
+  const prevBtn = document.createElement('button');
+  prevBtn.innerHTML = '◀';
+  prevBtn.style.cssText = `
+    background: rgba(61, 242, 255, 0.2);
+    border: 1px solid rgba(61, 242, 255, 0.4);
+    color: #3df2ff;
+    padding: 6px 12px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 14px;
+    transition: all 0.2s;
+  `;
+  prevBtn.onmouseover = () => prevBtn.style.background = 'rgba(61, 242, 255, 0.3)';
+  prevBtn.onmouseout = () => prevBtn.style.background = 'rgba(61, 242, 255, 0.2)';
+  prevBtn.onclick = () => {
+    if (currentPage > 0) {
+      currentPage--;
+      displayFlightPage(currentPage);
+      updatePagingDisplay();
+    }
+  };
+  
+  const pageInfo = document.createElement('span');
+  pageInfo.id = 'pageInfo';
+  pageInfo.style.cssText = `
+    color: white;
+    font-size: 14px;
+    min-width: 100px;
+    text-align: center;
+  `;
+  pageInfo.textContent = `Page ${currentPage + 1} / ${totalPages}`;
+  
+  const nextBtn = document.createElement('button');
+  nextBtn.innerHTML = '▶';
+  nextBtn.style.cssText = prevBtn.style.cssText;
+  nextBtn.onmouseover = () => nextBtn.style.background = 'rgba(61, 242, 255, 0.3)';
+  nextBtn.onmouseout = () => nextBtn.style.background = 'rgba(61, 242, 255, 0.2)';
+  nextBtn.onclick = () => {
+    if (currentPage < totalPages - 1) {
+      currentPage++;
+      displayFlightPage(currentPage);
+      updatePagingDisplay();
+    }
+  };
+  
+  const flightCount = document.createElement('span');
+  flightCount.style.cssText = `
+    color: rgba(255, 255, 255, 0.7);
+    font-size: 12px;
+    margin-left: 8px;
+  `;
+  flightCount.textContent = `${allFlightLines.length} flights`;
+  
+  container.appendChild(prevBtn);
+  container.appendChild(pageInfo);
+  container.appendChild(nextBtn);
+  container.appendChild(flightCount);
+  
+  pagingControls = container;
+  view.ui.add(pagingControls, 'bottom-right');
+}
+
+function updatePagingDisplay() {
+  const pageInfo = document.getElementById('pageInfo');
+  if (pageInfo) {
+    const totalPages = Math.ceil(allFlightLines.length / FLIGHTS_PER_PAGE);
+    pageInfo.textContent = `Page ${currentPage + 1} / ${totalPages}`;
+  }
+}
+
+function displayFlightPage(page) {
+  const view = window.view;
+  const FeatureLayer = window.FeatureLayer;
+  const Graphic = window.Graphic;
+  
+  if (!view || !view.map || !FeatureLayer || !Graphic) return;
+  
+  // Remove existing line layer
+  if (lineFeatureLayer) {
+    view.map.remove(lineFeatureLayer);
+    lineFeatureLayer = null;
+  }
+  
+  // Calculate slice
+  const start = page * FLIGHTS_PER_PAGE;
+  const end = Math.min(start + FLIGHTS_PER_PAGE, allFlightLines.length);
+  const pageFlights = allFlightLines.slice(start, end);
+  
+  if (pageFlights.length === 0) return;
+  
+  // Create graphics with unique colors
+  const lineGraphics = pageFlights.map((flightData, pageIndex) => {
+    const globalIndex = start + pageIndex;
+    const color = generateFlightColor(globalIndex);
+    const attr = flightData.attributes || {};
+    
+    return new Graphic({
+      geometry: flightData.geometry,
+      attributes: {
+        ObjectID: globalIndex,
+        type: attr.type || "Flight",
+        origin: attr.origin || "N/A",
+        destination: attr.destination || "N/A",
+        aircraft: attr.aircraft || "N/A",
+        operator: attr.operator || "N/A",
+        callsign: attr.callsign || "N/A",
+        id: String(attr.id || globalIndex),
+        name: attr.callsign || "Flight" // Wichtig für das Popup-Fallback
+      }
+    });
+  });
+  
+  // Create unique value renderer for individual colors
+  const uniqueValueInfos = lineGraphics.map((graphic, i) => {
+    const color = generateFlightColor(start + i);
+    return {
+      value: graphic.attributes.ObjectID,
+      symbol: {
+        type: "simple-line",
+        color: [...color, 0.8],
+        width: 2.5
+      }
+    };
+  });
+  
+  lineFeatureLayer = new FeatureLayer({
+    source: lineGraphics,
+    objectIdField: "ObjectID",
+    outFields: ["*"],
+    fields: [
+      { name: "ObjectID", alias: "ObjectID", type: "oid" },
+      { name: "type", alias: "Type", type: "string" },
+      { name: "origin", alias: "Origin", type: "string" },
+      { name: "destination", alias: "Destination", type: "string" },
+      { name: "aircraft", alias: "Aircraft", type: "string" },
+      { name: "operator", alias: "Operator", type: "string" },
+      { name: "callsign", alias: "Callsign", type: "string" },
+      { name: "id", alias: "ID", type: "string" },
+      { name: "name", alias: "Name", type: "string" }
+    ],
+    popupEnabled: false, // Disable default popup
+    renderer: {
+      type: "unique-value",
+      field: "ObjectID",
+      uniqueValueInfos: uniqueValueInfos,
+      defaultSymbol: {
+        type: "simple-line",
+        color: [0, 200, 255, 0.8],
+        width: 2.5
+      }
+    }
+  });
+  
+  view.map.add(lineFeatureLayer);
+  
+  // Zoom to current page
+  lineFeatureLayer.queryExtent().then((result) => {
+    if (result && result.extent) {
+      view.goTo(result.extent.expand(1.3));
+    }
+  });
+}
 
 function displayOnMap(data) {
   const view = window.view;
   const FeatureLayer = window.FeatureLayer;
   const Graphic = window.Graphic;
 
+  clearMap(); 
+
   if (!view || !view.map || !FeatureLayer || !Graphic) return;
 
-  // Clear existing layers if they exist
+  // Clear existing layers
   if (pointFeatureLayer) {
     view.map.remove(pointFeatureLayer);
     pointFeatureLayer = null;
@@ -420,17 +816,18 @@ function displayOnMap(data) {
     lineFeatureLayer = null;
   }
 
+  // Reset paging
+  allFlightLines = [];
+  currentPage = 0;
+
+  if (!data) return;
+
   // 1. Handle Points (Airports/Nodes)
   if (data.points && data.points.length > 0) {
     const pointGraphics = data.points.map((pt, index) => {
-      // FIX: Ensure coordinates are [Longitude, Latitude]
       let geom = pt.geometry;
       if (geom.latitude && geom.longitude) {
-        // If agent returned { latitude: 50, longitude: 7 }, ArcGIS handles it via key names
-        // But if values are flipped in properties (e.g. lat=7, lon=50), we might need to swap.
-        // Heuristic: For Europe, Lat (50ish) > Lon (7ish). 
         if (Math.abs(geom.latitude) < Math.abs(geom.longitude) && Math.abs(geom.longitude) > 30) {
-             // Values likely swapped
              const temp = geom.latitude;
              geom.latitude = geom.longitude;
              geom.longitude = temp;
@@ -449,31 +846,19 @@ function displayOnMap(data) {
     pointFeatureLayer = new FeatureLayer({
       source: pointGraphics,
       objectIdField: "ObjectID",
+      outFields: ["*"],
       fields: [
         { name: "ObjectID", alias: "ObjectID", type: "oid" },
         { name: "name", alias: "Name", type: "string" },
         { name: "type", alias: "Type", type: "string" },
-        { name: "desc", alias: "Description", type: "string" },
         { name: "id", alias: "ID", type: "string" }
       ],
-      popupTemplate: {
-        title: "{name}",
-        content: [
-          {
-            type: "fields",
-            fieldInfos: [
-              { fieldName: "type", label: "Category" },
-              { fieldName: "desc", label: "Details" },
-              { fieldName: "id", label: "Code" }
-            ]
-          }
-        ]
-      },
+      popupEnabled: false, // Disable default popup
       renderer: {
         type: "simple",
         symbol: {
           type: "simple-marker",
-          color: [255, 77, 109, 0.9], // Pink/Red for airports
+          color: [255, 77, 109, 0.9],
           size: "10px",
           outline: { color: [255, 255, 255, 0.8], width: 1 }
         }
@@ -483,69 +868,40 @@ function displayOnMap(data) {
     view.map.add(pointFeatureLayer);
   }
 
-  // 2. Handle Lines (Trajectories)
+  // 2. Handle Lines (Trajectories) - Store for paging
   if (data.lines && data.lines.length > 0) {
-    const lineGraphics = data.lines.map((ln, index) => {
+    data.lines.forEach((ln) => {
       let geom = ln.geometry;
       
-      // FIX: Swap coordinates for paths if necessary [Lat, Lon] -> [Lon, Lat]
-      // Agent output: [50.8, 7.1] (Lat, Lon) -> Needs to be [7.1, 50.8] (Lon, Lat)
+      // Fix coordinate order
       if (geom.paths && geom.paths.length > 0) {
         geom.paths = geom.paths.map(path => {
             return path.map(coord => {
-                // Heuristic: If 1st coord (x) > 2nd coord (y) and we are likely in Europe (x ~ 50),
-                // then x is Latitude. Swap them.
                 if (coord[0] > coord[1] && coord[0] > 30) {
-                    return [coord[1], coord[0]]; // Swap to [Lon, Lat]
+                    return [coord[1], coord[0]];
                 }
                 return coord;
             });
         });
       }
 
-      return new Graphic({
+      allFlightLines.push({
         geometry: geom,
-        attributes: {
-          ObjectID: index,
-          ...ln.attributes
-        }
+        attributes: ln.attributes
       });
     });
 
-    lineFeatureLayer = new FeatureLayer({
-      source: lineGraphics,
-      objectIdField: "ObjectID",
-      fields: [
-        { name: "ObjectID", alias: "ObjectID", type: "oid" },
-        { name: "name", alias: "Flight", type: "string" },
-        { name: "type", alias: "Type", type: "string" },
-        { name: "desc", alias: "Info", type: "string" },
-        { name: "id", alias: "ID", type: "string" }
-      ],
-      popupTemplate: {
-        title: "{name}",
-        content: "{desc}" 
-      },
-      renderer: {
-        type: "simple",
-        symbol: {
-          type: "simple-line",
-          color: [0, 200, 255, 0.8], // Cyan for flights
-          width: 2.5
-        }
-      }
-    });
-
-    view.map.add(lineFeatureLayer);
+    // Display first page and create controls
+    displayFlightPage(0);
+    createPagingControls();
   }
   
-  // 3. Zoom to new data
+  // 3. Zoom to all data
   const layersToZoom = [];
   if (pointFeatureLayer) layersToZoom.push(pointFeatureLayer);
   if (lineFeatureLayer) layersToZoom.push(lineFeatureLayer);
   
   if (layersToZoom.length > 0) {
-      // Use queryExtent to find the bounds of client-side features
       let promises = layersToZoom.map(l => l.queryExtent());
       Promise.all(promises).then((results) => {
           let combinedExtent = null;
@@ -557,11 +913,37 @@ function displayOnMap(data) {
           });
           
           if (combinedExtent) {
-              view.goTo(combinedExtent.expand(1.2)); // Expand by 20% for padding
+              view.goTo(combinedExtent.expand(1.2));
           }
       }).catch(console.error);
   }
+  
+  // NEW: Add click handler for custom popup (only once)
+  if (!view._customPopupHandlerAdded) {
+    view.on('click', (event) => {
+      view.hitTest(event).then((response) => {
+        if (response.results.length > 0) {
+          const result = response.results.find(r => 
+            r.graphic && r.graphic.layer && 
+            (r.graphic.layer === pointFeatureLayer || r.graphic.layer === lineFeatureLayer)
+          );
+          
+          if (result && result.graphic && result.graphic.attributes) {
+            showCustomPopup(result.graphic.attributes, event.screenPoint);
+            event.stopPropagation();
+          } else {
+            hideCustomPopup();
+          }
+        } else {
+          hideCustomPopup();
+        }
+      });
+    });
+    
+    view._customPopupHandlerAdded = true;
+  }
 }
+
 // Show uploaded polygon(s) on a separate layer and zoom to it
 function showUploadedGeojson(geojson) {
   const view = window.view;
@@ -596,7 +978,6 @@ function showUploadedGeojson(geojson) {
 
   if (!graphics.length) return;
   uploadLayer.addMany(graphics);
-  // zoom to uploaded polygon
   try { view.goTo(uploadLayer.graphics); } catch (e) {}
 }
 
@@ -650,4 +1031,60 @@ if (dataPanelClose) {
   });
 }
 
+// NEW: Clear Context Button Handler
+const clearContextBtn = document.getElementById('clearContextBtn');
+if (clearContextBtn) {
+  clearContextBtn.addEventListener('click', () => {
+    if (confirm('Clear conversation history? This will start a fresh context.')) {
+      clearChatContext();
+    }
+  });
+}
+
+function clearMap() {
+  const view = window.view;
+  if (!view) return;
+
+  // 1. Point Layer sicher entfernen
+  if (pointFeatureLayer && view.map) {
+    view.map.remove(pointFeatureLayer);
+    pointFeatureLayer = null;
+  }
+
+  // 2. Line Layer sicher entfernen
+  if (lineFeatureLayer && view.map) {
+    view.map.remove(lineFeatureLayer);
+    lineFeatureLayer = null;
+  }
+
+  // 3. Paging Variablen zurücksetzen
+  allFlightLines = [];
+  currentPage = 0;
+
+  // 4. Paging Controls aus dem UI entfernen
+  if (pagingControls && view.ui) {
+    view.ui.remove(pagingControls);
+    pagingControls = null;
+  }
+
+  // 5. DEIN Custom Popup schließen (wichtig!)
+  if (typeof hideCustomPopup === "function") {
+    hideCustomPopup();
+  }
+
+  // 6. ArcGIS Standard Popup sicher schließen (Fix für deinen Fehler)
+  if (view.popup) {
+    // Prüfen, ob die Funktion existiert, bevor sie aufgerufen wird
+    if (typeof view.popup.close === "function") {
+      view.popup.close();
+    } else {
+      // Fallback: Einfach unsichtbar schalten
+      view.popup.visible = false;
+    }
+  }
+
+  console.log("Map cleared successfully.");
+}
+
 autosize();
+
