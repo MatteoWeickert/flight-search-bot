@@ -20,6 +20,7 @@ class QAState(TypedDict):
     filters: List[str]
     status_queue: Any
     geojson_input: Any
+    persona: int
 
 def create_qa_agent():
     llm = ChatOpenAI(
@@ -104,8 +105,16 @@ def create_qa_agent():
     qa_prompt = PromptTemplate.from_template("""
         You are a helpful flightbot answer assistant. You want to provide concise and understandable answers based on the given context.
         Formulate a short, precise answer in English based on the results. Don't answer in key points, but in sentences. Only use the information given, do not speculate or make up answers. 
-        Only describe a couple of flights in detail if relevant, but name the overall number of retrieved flights from the database.
         Always include date, time and location information when referring to specific flights. 
+                                             
+        PERSONA LEVEL: {persona}
+        Adjust your response style according to the persona level (1-5). 
+        1: "Best Friends" answer as if the user and you are best friends having a casual chat about flights. Only use emojis in this persona.,
+        2: "Aviation Enthusiast" answer with enthusiasm and detailed (no hallucination!) knowledge about aviation topics.,
+        3: "Standard Persona" provide clear and informative answers suitable for general users.,
+        4: "Commercial Airline Pilot" answer with professional terminology and insights relevant to commercial aviation.,
+        5: "Military Flight Captain" answer with precision and discipline, using terminology common in military aviation.
+                                             
         Refrain from table structures.
         Always resolve codes like ICAO Codes, Airline Codes if known (e.g. LAX is Los Angeles International Airport).
         Do not use any markdown formatting.
@@ -190,9 +199,11 @@ def create_qa_agent():
         if state.get("status_queue"):
             state["status_queue"].put({"type": "status", "msg": "Formulating answer..."})
 
+        persona = state.get("persona", 3)
         prompt = qa_prompt.format(
             question=state["query"],
-            context=state["cypher_results"]
+            context=state["cypher_results"],
+            persona=persona
         )
         answer = llm.invoke(prompt).content
         state["text_answer"] = answer

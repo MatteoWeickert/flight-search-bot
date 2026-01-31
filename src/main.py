@@ -26,6 +26,8 @@ def chat():
     reasoning = data.get("reasoning", True)
     messages = data.get("messages", [])
 
+    persona = data.get("persona", 3)
+
     if not msg:
         return jsonify({"error": "message missing"}), 400
 
@@ -33,7 +35,7 @@ def chat():
 
     def task():
         try:
-            reply = process_query(msg, filters, reasoning, messages, status_queue, geojson_input)
+            reply = process_query(msg, filters, reasoning, messages, status_queue, geojson_input, persona)
             status_queue.put({"type": "result", "data": reply})
         finally:
             status_queue.put(None)

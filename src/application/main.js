@@ -3,29 +3,44 @@ const chatInput = document.getElementById("chatInput");
 const sendBtn = document.getElementById("sendBtn");
 const loading = document.getElementById("chatLoading");
 let resultLayer = null;
-let uploadLayer = null; // separate layer for user-uploaded polygon
+let uploadLayer = null;
 const messages = [];
 let nextMessageId = 1;
 
-// NEW: Function to clear chat context
+const personaBtn = document.getElementById("personaBtn");
+const personaPanel = document.getElementById("personaPanel");
+const personaPanelWrapper = document.getElementById("personaPanelWrapper");
+const personaPanelClose = document.getElementById("personaPanelClose");
+const personaSlider = document.getElementById("personaSlider");
+const personaValue = document.getElementById("personaValue");
+const personaDescription = document.getElementById("personaDescription");
+
+let selectedPersona = 3;
+
+const personaDescriptions = {
+  1: "Best Friends",
+  2: "Aviation Enthusiast",
+  3: "Standard Persona",
+  4: "Commercial Airline Pilot",
+  5: "Military Flight Captain"
+};
+
+
+
 function clearChatContext() {
-  messages.length = 0; // Clear messages array
+  messages.length = 0;
   nextMessageId = 1;
 
   clearMap();
 
-  
-  // Visual feedback
   const historyEl = document.querySelector('.chat-history');
   if (historyEl) {
-    // Add fade out animation
     console.log('Chat context and map cleared');
     historyEl.style.opacity = '0.5';
     setTimeout(() => {
       historyEl.innerHTML = '';
       historyEl.style.opacity = '1';
       
-      // Add confirmation message
       const confirmMsg = document.createElement('div');
       confirmMsg.style.cssText = `
         text-align: center;
@@ -67,18 +82,47 @@ const reasoningLabel = document.getElementById('reasoningLabel');
 
 const uploadBtn = document.getElementById('uploadBtn');
 const geojsonInput = document.getElementById('geojsonInput');
-let uploadedGeojson = null; // will hold the validated geojson for later processing
+let uploadedGeojson = null;
 
-// NEW: Paging variables
 let allFlightLines = [];
 let currentPage = 0;
 const FLIGHTS_PER_PAGE = 4;
 let pagingControls = null;
 
-// Ensure panels are hidden on load
 document.addEventListener('DOMContentLoaded', () => {
   if (kpiPanel) kpiPanel.classList.add('is-hidden');
   if (dataPanel) dataPanel.classList.add('is-hidden');
+  if (personaPanel) personaPanel.classList.add('is-hidden');
+
+  if (personaBtn && personaPanel) {
+  personaBtn.addEventListener('click', () => {
+    const isHidden = personaPanel.classList.contains('is-hidden');
+    if (isHidden) {
+      personaPanel.classList.remove('is-hidden');
+      setTimeout(() => personaPanel.classList.add('is-visible'), 10);
+    } else {
+      personaPanel.classList.remove('is-visible');
+      setTimeout(() => personaPanel.classList.add('is-hidden'), 300);
+    }
+  });
+}
+
+if (personaPanelClose) {
+  personaPanelClose.addEventListener('click', () => {
+    personaPanel.classList.remove('is-visible');
+    setTimeout(() => personaPanel.classList.add('is-hidden'), 300);
+  });
+}
+
+if (personaSlider) {
+  personaSlider.addEventListener('input', (e) => {
+    selectedPersona = parseInt(e.target.value);
+    personaValue.textContent = selectedPersona;
+    personaDescription.innerHTML = `<p>${personaDescriptions[selectedPersona]}</p>`;
+  });
+  
+  personaDescription.innerHTML = `<p>${personaDescriptions[selectedPersona]}</p>`;
+}
 });
 
 reasoningToggle.addEventListener('change', () => {
@@ -374,7 +418,8 @@ async function sendMessage() {
         messages: messages,
         filters: Array.from(filterState),
         reasoning: reasoningToggle.checked,
-        geojsonInput: uploadedGeojson || null
+        geojsonInput: uploadedGeojson || null,
+        persona: selectedPersona
       }),
     });
 
@@ -826,14 +871,6 @@ function displayOnMap(data) {
   if (data.points && data.points.length > 0) {
     const pointGraphics = data.points.map((pt, index) => {
       let geom = pt.geometry;
-      if (geom.latitude && geom.longitude) {
-        if (Math.abs(geom.latitude) < Math.abs(geom.longitude) && Math.abs(geom.longitude) > 30) {
-             const temp = geom.latitude;
-             geom.latitude = geom.longitude;
-             geom.longitude = temp;
-        }
-      }
-      
       return new Graphic({
         geometry: geom,
         attributes: {
@@ -877,9 +914,6 @@ function displayOnMap(data) {
       if (geom.paths && geom.paths.length > 0) {
         geom.paths = geom.paths.map(path => {
             return path.map(coord => {
-                if (coord[0] > coord[1] && coord[0] > 30) {
-                    return [coord[1], coord[0]];
-                }
                 return coord;
             });
         });

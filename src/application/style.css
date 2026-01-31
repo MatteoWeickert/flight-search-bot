@@ -1226,3 +1226,30 @@ button:focus-visible,textarea:focus-visible{
 #clearContextBtn:active {
   transform: translateY(0);
 }
+
+.custom-slider {
+  width: 100%;
+  accent-color: var(--accent); /* Uses your #3df2ff cyan */
+  background: rgba(255, 255, 255, 0.1);
+  height: 6px;
+  border-radius: 3px;
+  cursor: pointer;
+}
+
+.slider-labels {
+  display: flex; 
+  justify-content: space-between; 
+  margin-top: 8px; 
+  font-size: 11px; 
+  color: var(--muted);
+  font-family: 'Inter', sans-serif;
+}
+
+.persona-text {
+  margin-top: 18px; 
+  font-style: italic; 
+  font-size: 13px; 
+  text-align: center; 
+  color: var(--accent);
+  text-shadow: 0 0 10px rgba(61, 242, 255, 0.3);
+}

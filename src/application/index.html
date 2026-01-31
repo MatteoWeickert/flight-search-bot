@@ -29,6 +29,12 @@
                   <path fill-rule="evenodd" d="M0 0h1v15h15v1H0zm14.817 3.113a.5.5 0 0 1 .07.704l-4.5 5.5a.5.5 0 0 1-.74.037L7.06 6.767l-3.656 5.027a.5.5 0 0 1-.808-.588l4-5.5a.5.5 0 0 1 .758-.06l2.609 2.61 4.15-5.073a.5.5 0 0 1 .704-.07"/>
                 </svg>
               </button>
+              <button  class="account-icon-slot" id="personaBtn" class="glass-btn" title="Choose Persona">
+                <svg width="18" height="18" fill="currentColor" viewBox="0 0 16 16">
+                  <path d="M11 6a3 3 0 1 1-6 0 3 3 0 0 1 6 0z"/>
+                  <path fill-rule="evenodd" d="M0 8a8 8 0 1 1 16 0A8 8 0 0 1 0 8zm8-7a7 7 0 0 0-5.468 11.37C3.242 11.226 4.805 10 8 10s4.757 1.225 5.468 2.37A7 7 0 0 0 8 1z"/>
+                </svg>
+              </button>
               <button class="account-icon-slot" id="dataBtn" aria-label="Data">
                 <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-table" viewBox="0 0 16 16">
                   <path d="M0 2a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2zm15 2h-4v3h4zm0 4h-4v3h4zm0 4h-4v3h3a1 1 0 0 0 1-1zm-5 3v-3H6v3zm-5 0v-3H1v2a1 1 0 0 0 1 1zm-4-4h4V8H1zm0-4h4V4H1zm5-3v3h4V4zm4 4H6v3h4z"/>
@@ -126,6 +132,46 @@
             </div>
             <div class="data-body">
               <div id="dataPanelTableWrapper" class="data-table-wrapper"></div>
+            </div>
+          </div>
+        </aside>
+        <aside id="personaPanel" class="data-panel glass fade-in-down is-hidden" aria-label="Persona Settings">
+          <div class="data-boundary">
+            <div class="data-header">
+              <div class="data-header-left">
+                <p class="data-header-title">Agent Persona</p>
+              </div>
+              <div class="data-header-right">
+                <button id="personaPanelClose" type="button" class="data-header-close" title="Close" aria-label="Close persona panel">×</button>
+              </div>
+            </div>
+            <div class="data-body">
+              <div id="personaPanelWrapper" class="persona-panel-content" style="padding: 20px;">
+                <div style="margin-bottom: 20px;">
+                  <label for="personaSlider" style="display: block; margin-bottom: 15px; color: var(--text); font-weight: 500;">
+                    Select Persona: <span id="personaValue" style="color: var(--accent);">3</span>
+                  </label>
+                  <input 
+                    type="range" 
+                    id="personaSlider" 
+                    min="1" 
+                    max="5" 
+                    value="3" 
+                    step="1"
+                    style="width: 100%; cursor: pointer;"
+                  >
+                  <div style="display: flex; justify-content: space-between; margin-top: 8px; font-size: 11px; color: var(--muted);">
+                    <span>1</span>
+                    <span>2</span>
+                    <span>3</span>
+                    <span>4</span>
+                    <span>5</span>
+                  </div>
+                </div>
+                <div id="personaDescription" style="padding: 15px; background: rgba(0,0,0,0.2); border-radius: 8px; min-height: 80px; color: var(--text); font-size: 13px; line-height: 1.6;">
+                  <p></p>
+                </div>
+              </div>
             </div>
           </div>
         </aside>

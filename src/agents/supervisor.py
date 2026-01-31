@@ -28,7 +28,8 @@ class SupervisorState(TypedDict):
     table_output: str
     kpi_output: str
     messages: list
-    status_queue: Any  # NEU
+    status_queue: Any
+    persona: int
 
 def create_supervisor():
     llm = ChatOpenAI(
@@ -164,7 +165,8 @@ def create_supervisor():
             "query": state["query"], 
             "filters": state["filters"],
             "status_queue": state.get("status_queue"),
-            "geojson_input": state.get("geojson_input", {})
+            "geojson_input": state.get("geojson_input", {}),
+            "persona": state.get("persona", 3)
         })
         state["text_answer"] = result["text_answer"]
         state["cypher_query"] = result["cypher_query"]
@@ -231,10 +233,11 @@ def create_supervisor():
 
 supervisor = create_supervisor()
 
-def process_query(query: str, filters: list = None, reasoning: bool = False, messages: list = None, status_queue = None, geojson_input = None) -> dict:
+def process_query(query: str, filters: list = None, reasoning: bool = False, messages: list = None, status_queue = None, geojson_input = None, persona = None) -> dict:
     if filters is None: filters = []
     if messages is None: messages = []
     if geojson_input is None: geojson_input = {}
+    if persona is None: persona = 3
 
     initial_state = {
         "query": query,
@@ -250,7 +253,8 @@ def process_query(query: str, filters: list = None, reasoning: bool = False, mes
         "kpi_output": "", 
         "messages": messages,
         "status_queue": status_queue,
-        "geojson_input": geojson_input
+        "geojson_input": geojson_input,
+        "persona": persona
     }
 
     try:

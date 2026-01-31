@@ -36,7 +36,8 @@ def create_map_agent():
 
     CRITICAL COORDINATE RULES:
     - Neo4j trajectory_array: [[Lon, Lat, Flight Level, Timestamp], ...]
-    - REQUIRED Output: [Longitude, Latitude]
+    - ALWAYS use [Longitude, Latitude] order (X, Y)
+    - Example: London is approx [-0.12, 51.50], NOT [51.50, -0.12].
     - Remove altitude and timestamp.
     - Example Input: [7.14, 50.86, 123, "2024-01-01"]
     - Output: [7.14, 50.86]
