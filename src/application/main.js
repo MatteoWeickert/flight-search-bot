@@ -33,6 +33,20 @@ function clearChatContext() {
 
   clearMap();
 
+  // Lösche gecachte Panel-Daten
+  window._cachedTableHtml = null;
+  window._cachedKpiHtml = null;
+
+  // Entferne Indikatoren
+  if (dataBtn) {
+    const indicator = dataBtn.querySelector('span[style*="background:#22c55e"]');
+    if (indicator) indicator.remove();
+  }
+  if (kpiBtn) {
+    const indicator = kpiBtn.querySelector('span[style*="background:#22c55e"]');
+    if (indicator) indicator.remove();
+  }
+
   const historyEl = document.querySelector('.chat-history');
   if (historyEl) {
     console.log('Chat context and map cleared');
@@ -85,6 +99,7 @@ const geojsonInput = document.getElementById('geojsonInput');
 let uploadedGeojson = null;
 
 let allFlightLines = [];
+let allFlightPoints = [];
 let currentPage = 0;
 const FLIGHTS_PER_PAGE = 4;
 let pagingControls = null;
@@ -445,7 +460,7 @@ async function sendMessage() {
           } 
           else if (json.type === "result") {
             const data = json.data;
-            const chatText = data.chat_text || "Keine Antwort";
+            const chatText = data.chat_text || "No answer";
             const reasoningSummary = data.reasoning_summary || null;
             const mapData = data.map;
             const tableHtml = data.table_html;
@@ -453,12 +468,35 @@ async function sendMessage() {
 
             appendMessage("bot", chatText, reasoningSummary);
 
+            // if (tableHtml && tableHtml.trim()) {
+            //   showTablePanel(tableHtml);
+            // }
+            // if (kpiHtml && kpiHtml.trim()) {
+            //   showKpiPanel(kpiHtml);
+            // }
+
             if (tableHtml && tableHtml.trim()) {
-              showTablePanel(tableHtml);
+              // Speichere für späteren Abruf
+              window._cachedTableHtml = tableHtml;
+              // Visueller Hinweis, dass Daten verfügbar sind
+              if (dataBtn) {
+                dataBtn.style.position = 'relative';
+                dataBtn.innerHTML = dataBtn.innerHTML.replace('<!-- indicator -->', '') + 
+                  '<span style="position:absolute;top:4px;right:4px;width:8px;height:8px;background:#22c55e;border-radius:50%;box-shadow:0 0 4px #22c55e;"><!-- indicator --></span>';
+              }
             }
+
             if (kpiHtml && kpiHtml.trim()) {
-              showKpiPanel(kpiHtml);
+              // Speichere für späteren Abruf
+              window._cachedKpiHtml = kpiHtml;
+              // Visueller Hinweis, dass Daten verfügbar sind
+              if (kpiBtn) {
+                kpiBtn.style.position = 'relative';
+                kpiBtn.innerHTML = kpiBtn.innerHTML.replace('<!-- indicator -->', '') +
+                  '<span style="position:absolute;top:4px;right:4px;width:8px;height:8px;background:#22c55e;border-radius:50%;box-shadow:0 0 4px #22c55e;"><!-- indicator --></span>';
+              }
             }
+
             if (mapData && ((mapData.points && mapData.points.length > 0) || (mapData.lines && mapData.lines.length > 0))) {
               console.log("Displaying map data:", mapData);
               displayOnMap(mapData);
@@ -761,6 +799,11 @@ function displayFlightPage(page) {
     view.map.remove(lineFeatureLayer);
     lineFeatureLayer = null;
   }
+
+  if (pointFeatureLayer) {
+    view.map.remove(pointFeatureLayer);
+    pointFeatureLayer = null;
+  }
   
   // Calculate slice
   const start = page * FLIGHTS_PER_PAGE;
@@ -768,6 +811,53 @@ function displayFlightPage(page) {
   const pageFlights = allFlightLines.slice(start, end);
   
   if (pageFlights.length === 0) return;
+
+  const relevantPointIndices = new Set();
+  pageFlights.forEach(flight => {
+    const attrs = flight.attributes || {};
+    // Suche Punkte basierend auf origin/destination
+    allFlightPoints.forEach((point, idx) => {
+      const pAttrs = point.attributes || {};
+      if (
+        (attrs.origin && pAttrs.id === attrs.origin) ||
+        (attrs.destination && pAttrs.id === attrs.destination)
+      ) {
+        relevantPointIndices.add(idx);
+      }
+    });
+  });
+
+   if (relevantPointIndices.size > 0) {
+    const pagePoints = Array.from(relevantPointIndices).map(idx => allFlightPoints[idx]);
+    const pointGraphics = pagePoints.map(pt => new Graphic({
+      geometry: pt.geometry,
+      attributes: pt.attributes
+    }));
+    
+    pointFeatureLayer = new FeatureLayer({
+      source: pointGraphics,
+      objectIdField: "ObjectID",
+      outFields: ["*"],
+      fields: [
+        { name: "ObjectID", alias: "ObjectID", type: "oid" },
+        { name: "name", alias: "Name", type: "string" },
+        { name: "type", alias: "Type", type: "string" },
+        { name: "id", alias: "ID", type: "string" }
+      ],
+      popupEnabled: false,
+      renderer: {
+        type: "simple",
+        symbol: {
+          type: "simple-marker",
+          color: [255, 77, 109, 0.9],
+          size: "10px",
+          outline: { color: [255, 255, 255, 0.8], width: 1 }
+        }
+      }
+    });
+    
+    view.map.add(pointFeatureLayer);
+  }
   
   // Create graphics with unique colors
   const lineGraphics = pageFlights.map((flightData, pageIndex) => {
@@ -863,47 +953,22 @@ function displayOnMap(data) {
 
   // Reset paging
   allFlightLines = [];
+  allFlightPoints = [];
   currentPage = 0;
 
   if (!data) return;
 
   // 1. Handle Points (Airports/Nodes)
   if (data.points && data.points.length > 0) {
-    const pointGraphics = data.points.map((pt, index) => {
-      let geom = pt.geometry;
-      return new Graphic({
-        geometry: geom,
+      allFlightPoints = data.points.map((pt, index) => ({
+        geometry: pt.geometry,
         attributes: {
           ObjectID: index,
           ...pt.attributes
         }
-      });
-    });
-
-    pointFeatureLayer = new FeatureLayer({
-      source: pointGraphics,
-      objectIdField: "ObjectID",
-      outFields: ["*"],
-      fields: [
-        { name: "ObjectID", alias: "ObjectID", type: "oid" },
-        { name: "name", alias: "Name", type: "string" },
-        { name: "type", alias: "Type", type: "string" },
-        { name: "id", alias: "ID", type: "string" }
-      ],
-      popupEnabled: false, // Disable default popup
-      renderer: {
-        type: "simple",
-        symbol: {
-          type: "simple-marker",
-          color: [255, 77, 109, 0.9],
-          size: "10px",
-          outline: { color: [255, 255, 255, 0.8], width: 1 }
-        }
-      }
-    });
-
-    view.map.add(pointFeatureLayer);
-  }
+    }))
+  };
+  
 
   // 2. Handle Lines (Trajectories) - Store for paging
   if (data.lines && data.lines.length > 0) {
@@ -1040,6 +1105,15 @@ function hideKpiPanel() {
 if (kpiBtn) {
   kpiBtn.addEventListener("click", () => {
     if (!kpiPanel) return;
+    
+    // Lade gecachte Daten, falls vorhanden
+    if (window._cachedKpiHtml && kpiPanelWrapper) {
+      kpiPanelWrapper.innerHTML = window._cachedKpiHtml;
+      // Entferne Indikator
+      const indicator = kpiBtn.querySelector('span[style*="background:#22c55e"]');
+      if (indicator) indicator.remove();
+    }
+    
     kpiPanel.classList.toggle("is-hidden");
   });
 }
@@ -1054,6 +1128,15 @@ if (kpiPanelClose) {
 if (dataBtn) {
   dataBtn.addEventListener("click", () => {
     if (!dataPanel) return;
+    
+    // Lade gecachte Daten, falls vorhanden
+    if (window._cachedTableHtml && dataPanelWrapper) {
+      dataPanelWrapper.innerHTML = window._cachedTableHtml;
+      // Entferne Indikator
+      const indicator = dataBtn.querySelector('span[style*="background:#22c55e"]');
+      if (indicator) indicator.remove();
+    }
+    
     dataPanel.classList.toggle("is-hidden");
   });
 }
@@ -1093,6 +1176,7 @@ function clearMap() {
 
   // 3. Paging Variablen zurücksetzen
   allFlightLines = [];
+  allFlightPoints = [];
   currentPage = 0;
 
   // 4. Paging Controls aus dem UI entfernen

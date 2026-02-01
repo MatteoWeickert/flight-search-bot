@@ -60,7 +60,7 @@ def calculate_matching_FIR_to_geojson(geojson_data: dict, fir_data: dict) -> Lis
     
     Args:
         geojson_data: Das GeoJSON Dictionary des Such-Polygons (Feature oder Geometry).
-        fir_data: Die FeatureCollection aller FIRs (aus deinem vorherigen Schritt).
+        fir_data: Die FeatureCollection aller FIRs.
         
     Returns:
         Eine Liste mit den IDs der passenden FIRs.
@@ -94,6 +94,7 @@ def calculate_matching_FIR_to_geojson(geojson_data: dict, fir_data: dict) -> Lis
 def retrieve_flights_passing_FIRs(fir_ids: List[str]) -> List[dict]:
     """
     Holt alle Flüge, die durch die angegebenen FIRs fliegen.
+    Berücksichtigt das Linked-List-Modell der Trajektorien.
     
     Args:
         fir_ids: Liste der FIR-IDs (z.B. ['KZLAFIR', 'KZLAUIR']).
@@ -102,18 +103,26 @@ def retrieve_flights_passing_FIRs(fir_ids: List[str]) -> List[dict]:
     """
 
     query = """
-    //Alle Flüge, die durch die angegebenen FIRs fliegen
-    MATCH (f:Flight)-[r:TRAVERSED]->(fir:FIR)
+    // 1. Finde alle Flüge, die die FIRs durchquert haben
+    MATCH (f:Flight)-[:TRAVERSED]->(fir:FIR)
     WHERE fir.id IN $fir_ids
-    // Sicherstellen, dass jeder Flug nur einmal zurückgegeben wird
+    
+    // Reduziere auf eindeutige Flüge, falls ein Flug mehrere der gesuchten FIRs durchfliegt
     WITH DISTINCT f
-    // Die Trajektorie des Fluges abrufen
-    MATCH (f)-[:HAS_POINT]->(p:TrajectoryPoint)
-    // Punkte nach Sequenz sortieren
+
+    // 2. Finde den Startpunkt der Trajektorie (HAS_POINT zeigt nur auf den ersten)
+    MATCH (f)-[:HAS_POINT]->(start:TrajectoryPoint)
+
+    // 3. Folge der Kette (Linked List) vom Startpunkt aus
+    // [:NEXT*0..] bedeutet: Nimm den Startpunkt selbst (0) und alle folgenden (..)
+    MATCH (start)-[:NEXT*0..]->(p:TrajectoryPoint)
+
+    // 4. Sicherheitshalber sortieren (falls der Graph-Traverse nicht linear wäre)
     WITH f, p ORDER BY p.seq ASC
 
+    // 5. Ergebnis formatieren
     RETURN f.id AS flight_id, 
-        collect([p.lon, p.lat]) AS trajectory
+           collect([p.lon, p.lat]) AS trajectory
     """
     
     # Parameter für die Query vorbereiten
@@ -178,13 +187,20 @@ def retrieve_flights_within_geojson(geojson_data: dict, flights: List[dict]) -> 
     MATCH (f:Flight)
     WHERE f.id IN $flight_ids
     
-    // Wir holen uns auch Start- und Ziel-Flughafen Infos dazu
+    // Flughäfen abrufen (Optional, falls Daten fehlen)
     OPTIONAL MATCH (f)-[:DEPARTED_FROM]->(dep:Airport)
     OPTIONAL MATCH (f)-[:ARRIVED_AT]->(arr:Airport)
-    OPTIONAL MATCH (f)-[:HAS_POINT]->(p:TrajectoryPoint)
-    WITH f, dep, arr, p ORDER BY p.seq ASC
-
     
+    // Trajektorie abrufen (Linked List Logik)
+    // 1. Startpunkt finden
+    OPTIONAL MATCH (f)-[:HAS_POINT]->(start:TrajectoryPoint)
+    // 2. Kette durchlaufen (Startpunkt + alle Nachfolger)
+    OPTIONAL MATCH (start)-[:NEXT*0..]->(p:TrajectoryPoint)
+
+    // Sortierung sicherstellen
+    WITH f, dep, arr, p 
+    ORDER BY p.seq ASC
+
     RETURN f.id AS flight_id,
            f.callsign AS callsign,
            f.ac_type AS ac_type,
@@ -195,7 +211,7 @@ def retrieve_flights_within_geojson(geojson_data: dict, flights: List[dict]) -> 
            dep.lon AS origin_lon,
            arr.lat AS dest_lat,
            arr.lon AS dest_lon,
-           collect([p.lon, p.lat, p.fl, p.time]) AS trajectory_array
+           collect([p.lon, p.lat, p.fl, toString(p.time)]) AS trajectory_array
     """
     
     params = {"flight_ids": matching_ids}

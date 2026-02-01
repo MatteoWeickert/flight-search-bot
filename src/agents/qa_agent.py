@@ -40,34 +40,42 @@ def create_qa_agent():
 
     cypher_prompt = PromptTemplate.from_template("""
         You are an expert in Cypher and create ONLY a valid Cypher query.
+        SCHEMA / DATA MODEL CONTEXT:
+            - **Airports**: (:Flight)-[:DEPARTED_FROM|ARRIVED_AT]->(:Airport)
+            - **FIRs**: (:Flight)-[:TRAVERSED [entry_time, exit_time]]->(:FIR) -> Star Topology (sorted by relationship property)
+            - **Trajectory**: (:Flight)-[:HAS_POINT]->(:TrajectoryPoint)-[:NEXT]->(:TrajectoryPoint)... -> Linked List Topology!
+        * The Flight is connected ONLY to the first point via HAS_POINT.
+        * All subsequent points are connected via NEXT.    
+                                                 
         Use only labels/properties/relations from this schema:
         {schema}
+                                                 
+        NAMING CONVENTIONS:
+        - Use ICAO Codes for Airports (e.g. 'EDDM').
+        - Use ICAO Codes for Airlines (e.g. 'DLH').
+        - Use ICAO Codes for Aircraft types (e.g. 'A320').
         
-        Be aware that e.g. DEP_AP etc use ICAO Codes and therefore need to be used in the query like that.
-        Always use ICAO Codes when referring to Airports.
-        When referring to Airlines, use their standard codes (e.g. DLH for Lufthansa).
-        When referring to Aircrafts, use their professional code i.e. A388 when referring to an Airbus A380-800.
-
+        
         MANDATORY METADATA RULE:
-        Whenever you query a Flight (f:Flight) with a arrival airport (arr_ap:Airport) or departure airport (dep_ap:Airport) in the relation 
-        (f)-[:departed_from]->(dep_ap) or (f)-[:arrived_at]->(arr_ap), you MUST return the following properties if available:
+        Whenever you query a Flight (f:Flight), you MUST return the standard flight details including origin and destination codes:
         - f.id (as id)
         - f.callsign (as callsign)
-        - dep_ap.code (as origin)
-        - arr_ap.code (as destination)
         - f.ac_type (as aircraft)
         - f.operator (as operator)
+        - dep.code (as origin)
+        - arr.code (as destination)
         
         User filters: {filters}
         
         MANDATORY RULES FOR FILTERS:
         1. If filters list contains 'tj' (Trajectories):
-        - You MUST use: OPTIONAL MATCH (f)-[:has_point]->(tr:TrajectoryPoint) (many points per flight)
-        - You MUST sequence the points by their seq stamp: ORDER BY tr.seq_stamp
+        - **CRITICAL**: Do NOT just match (f)-[:HAS_POINT]->(p). This will only return the first point.
+        - You MUST traverse the linked list using variable length paths.
+        - PATTERN: `MATCH (f)-[:HAS_POINT]->(start:TrajectoryPoint)-[:NEXT*0..]->(p:TrajectoryPoint)`
+        - You MUST return a collected list of maps containing lon and lat point data (lon, lat).
         - FEW SHOT EXAMPLE:
-            MATCH (f)-[:HAS_POINT]->(p:TrajectoryPoint)
-            WITH f, p ORDER BY p.seq ASC
-            collect([p.lon, p.lat]) AS trajectory_array
+            MATCH (f:Flight ...)-[:HAS_POINT]->(start:TrajectoryPoint)-[:NEXT*0..]->(p:TrajectoryPoint)
+            RETURN f.callsign, collect([p.lon, p.lat]) as trajectory_array
         - Implement ALL available data inside a point (height, timestamp) inside the trajectory array.
         
         2. If filters list contains 'ap' (Airports):
@@ -90,14 +98,16 @@ def create_qa_agent():
         
         REQUIRED RETURN FORMAT:
         RETURN 
-            - f.id (as id)
-            - f.callsign (as callsign)
-            - dep_ap.code (as origin)
-            - arr_ap.code (as destination)
-            - f.ac_type (as aircraft)
-            - f.operator (as operator)
+            f.id as id,
+            f.callsign as callsign,
+            f.ac_type as aircraft,
+            f.operator as operator,
+            dep.code as origin,
+            arr.code as destination,
+            // If 'tj' is active:
             collect([p.lon, p.lat]) as trajectory_array
-        ORDER BY f.flight_id
+            // If 'fir' is active:
+            collect(DISTINCT fir.id) as firs
         
         Question: {query}
     """
