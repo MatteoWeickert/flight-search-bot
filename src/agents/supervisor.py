@@ -85,11 +85,21 @@ def create_supervisor():
     """)
 
     reasoning_prompt = PromptTemplate.from_template("""
-    Explain briefly why these agents were selected.
-    User query: {query}
-    Selected agents: {agents}
-    User filters: {filters}
-    Keep it to 1-2 sentences.
+        Explain briefly why these agents were selected. Here are explanatory details:
+        QA-Agent: Queries the Database with openCypher, provides the data to all other agents over the supervisior agent and gererates the text answer.
+        Map-Agent: Visualizes geospatial data like airports, routes, trajectories on a map based on the filters.
+        Table-Agent: Generates HTML tables and HTML KPI insights for detailed inspection of data based on the filters.
+        Internal Knowledge:
+        The Map Agent displays data based on the filters the user selected:
+        1. IF 'ap' in filters OR filters is empty → Extract Airports as Points
+        2. IF 'tj' in filters OR filters is empty → Extract Trajectories as Lines
+        3. IF 'ot' in filters → Display other relevant spatial data
+        User query: {query}
+        Selected agents: {agents}
+        User filters: {filters}
+        Text answer the user will see: {text_answer}
+        It is crucial to look at the text_answer to understand what the agents internally did. Explain that too.
+        Keep it to 1-2 sentences. Remove any markdown ** or other formatting. Keep it plain text.
     """)
 
 
@@ -149,7 +159,8 @@ def create_supervisor():
             prompt = reasoning_prompt.format(
                 query=state["query"],
                 agents=", ".join(state["agents_to_call"]),
-                filters=state["filters"]
+                filters=state["filters"],
+                text_answer=state.get("text_answer", "")
             )
             reasoning_summary = llm.invoke(prompt).content.strip()
             state["reasoning_summary"] = reasoning_summary

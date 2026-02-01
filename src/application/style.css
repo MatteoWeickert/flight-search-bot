@@ -829,17 +829,6 @@ button:focus-visible,textarea:focus-visible{
   transition: transform 0.3s ease;
 }
 
-.reasoning-content {
-  max-height: 0;
-  overflow: hidden;
-  transition: max-height 0.3s ease;
-  margin-top: 6px;
-  padding: 0 8px;
-  font-size: 10px;
-  color: var(--fg-1);
-  opacity: 0.85;
-  line-height: 1.4;
-}
 
 .kpi-panel {
   position: absolute;
@@ -1195,24 +1184,6 @@ button:focus-visible,textarea:focus-visible{
   transition: transform 0.3s ease;
 }
 
-.reasoning-content {
-  /* Startzustand: geschlossen */
-  max-height: 0;
-  overflow: hidden;
-  opacity: 0;
-  
-  /* Animation für Höhe, Padding und Opacity */
-  transition: max-height 0.3s ease, opacity 0.3s ease, padding 0.3s ease;
-  
-  margin-top: 0; /* Margin wird beim Öffnen via Padding im JS simuliert */
-  
-  /* Text Styling */
-  font-size: 11px; /* Besser lesbar */
-  color: var(--fg-1);
-  line-height: 1.5; /* Mehr Zeilenabstand */
-  white-space: pre-wrap; /* Zeilenumbrüche respektieren */
-}
-
 #clearContextBtn {
   transition: all 0.2s ease;
 }
@@ -1252,4 +1223,23 @@ button:focus-visible,textarea:focus-visible{
   text-align: center; 
   color: var(--accent);
   text-shadow: 0 0 10px rgba(61, 242, 255, 0.3);
+}
+
+/* --- REASONING STYLING UPDATE --- */
+.reasoning-content {
+  max-height: 0;
+  overflow: hidden;
+  opacity: 0;
+  color: inherit; 
+  transition: max-height 0.3s ease-out, opacity 0.3s ease, margin 0.3s ease;
+  
+  font-size: 11px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  padding: 0 8px; 
+}
+
+.reasoning-content.is-open {
+  opacity: 0.9;
+  margin-top: 8px;
 }

@@ -163,10 +163,6 @@ if (uploadBtn && geojsonInput) {
         return;
       }
 
-      // Validation rules (simple):
-      // - Accept FeatureCollection with exactly one feature whose geometry is Polygon or MultiPolygon
-      // - OR accept a Feature whose geometry is Polygon
-      // - OR accept a raw geometry object of type Polygon
       let ok = false;
       if (data && typeof data === 'object') {
         if (data.type === 'FeatureCollection') {
@@ -320,21 +316,23 @@ function appendMessage(role, text, reasoningText = null) {
 
     let isOpen = false;
     toggleBtn.addEventListener("click", (e) => {
-      e.stopPropagation();
-      isOpen = !isOpen;
+          e.stopPropagation();
+          isOpen = !isOpen;
 
-      if (isOpen) {
-        reasoningContent.style.maxHeight = reasoningContent.scrollHeight + "px";
-        reasoningContent.style.padding = "8px";
-        toggleBtn.querySelector("span").textContent = "Hide reasoning";
-        toggleBtn.querySelector(".reasoning-icon").style.transform = "rotate(180deg)";
-      } else {
-        reasoningContent.style.maxHeight = "0";
-        reasoningContent.style.padding = "0";
-        toggleBtn.querySelector("span").textContent = "Show reasoning";
-        toggleBtn.querySelector(".reasoning-icon").style.transform = "rotate(0deg)";
-      }
-    });
+          if (isOpen) {
+            reasoningContent.classList.add("is-open");
+            reasoningContent.style.maxHeight = reasoningContent.scrollHeight + "px";
+            
+            toggleBtn.querySelector("span").textContent = "Hide reasoning";
+            toggleBtn.querySelector(".reasoning-icon").style.transform = "rotate(180deg)";
+          } else {
+            reasoningContent.classList.remove("is-open");
+            reasoningContent.style.maxHeight = "0";
+            
+            toggleBtn.querySelector("span").textContent = "Show reasoning";
+            toggleBtn.querySelector(".reasoning-icon").style.transform = "rotate(0deg)";
+          }
+        });
 
     reasoningWrapper.appendChild(toggleBtn);
     reasoningWrapper.appendChild(reasoningContent);
