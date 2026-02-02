@@ -958,14 +958,59 @@ function displayOnMap(data) {
 
   // 1. Handle Points (Airports/Nodes)
   if (data.points && data.points.length > 0) {
-      allFlightPoints = data.points.map((pt, index) => ({
-        geometry: pt.geometry,
-        attributes: {
-          ObjectID: index,
-          ...pt.attributes
-        }
-    }))
-  };
+      allFlightPoints = data.points.map((pt, index) => {
+        const attr = pt.attributes || {};
+        return {
+          geometry: pt.geometry,
+          attributes: {
+            ObjectID: index,
+            type: attr.type || "Airport",
+            name: attr.name || attr.icao || "N/A",
+            icao: attr.icao || "N/A",
+            origin: attr.origin || attr.icao || "N/A",
+            destination: attr.destination || "N/A",
+            aircraft: attr.aircraft || "N/A",
+            operator: attr.operator || "N/A",
+            callsign: attr.callsign || "N/A",
+            id: String(attr.id || attr.icao || index)
+          }
+        };
+      });
+
+      const pointGraphics = allFlightPoints.map(pt => new Graphic({
+          geometry: pt.geometry,
+          attributes: pt.attributes
+      }));
+
+      pointFeatureLayer = new FeatureLayer({
+          source: pointGraphics,
+          objectIdField: "ObjectID",
+          outFields: ["*"],
+          fields: [
+            { name: "ObjectID", alias: "ObjectID", type: "oid" },
+            { name: "type", alias: "Type", type: "string" },
+            { name: "name", alias: "Name", type: "string" },
+            { name: "icao", alias: "ICAO", type: "string" },
+            { name: "origin", alias: "Origin", type: "string" },
+            { name: "destination", alias: "Destination", type: "string" },
+            { name: "aircraft", alias: "Aircraft", type: "string" },
+            { name: "operator", alias: "Operator", type: "string" },
+            { name: "callsign", alias: "Callsign", type: "string" },
+            { name: "id", alias: "ID", type: "string" }
+          ],
+          popupEnabled: false,
+          renderer: {
+              type: "simple",
+              symbol: {
+                  type: "simple-marker",
+                  color: [255, 77, 109, 0.9], // Pink/Red color
+                  size: "12px",
+                  outline: { color: [255, 255, 255, 1], width: 1 }
+              }
+          }
+      });
+      view.map.add(pointFeatureLayer);
+  }
   
 
   // 2. Handle Lines (Trajectories) - Store for paging
