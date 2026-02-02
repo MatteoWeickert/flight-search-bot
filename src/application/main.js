@@ -88,7 +88,7 @@ const dataPanel = document.getElementById("dataPanel");
 const dataPanelWrapper = document.getElementById("dataPanelTableWrapper");
 const dataPanelClose = document.getElementById("dataPanelClose");
 
-const filterState = new Set();
+const filterState = new Set(['ap', 'tj']);
 const filterButtons = document.querySelectorAll('.filter-btn');
 
 const reasoningToggle = document.getElementById('reasoningToggle');
@@ -108,6 +108,10 @@ document.addEventListener('DOMContentLoaded', () => {
   if (kpiPanel) kpiPanel.classList.add('is-hidden');
   if (dataPanel) dataPanel.classList.add('is-hidden');
   if (personaPanel) personaPanel.classList.add('is-hidden');
+
+  filterButtons.forEach(btn => {
+    if (filterState.has(btn.dataset.filter)) btn.classList.add('active');
+  });
 
   if (personaBtn && personaPanel) {
   personaBtn.addEventListener('click', () => {
@@ -208,29 +212,12 @@ if (uploadBtn && geojsonInput) {
 filterButtons.forEach(btn => {
   btn.addEventListener('click', () => {
     const filter = btn.dataset.filter;
+    btn.classList.toggle('active');
     
     if (filterState.has(filter)) {
       filterState.delete(filter);
-      btn.classList.remove('active');
     } else {
-      if (filterState.size === 2 && !filterState.has(filter)) {
-        return;
-      }
-      
-      if (filter === 'ot') {
-        filterState.clear();
-        filterButtons.forEach(b => b.classList.remove('active'));
-      } else {
-        filterState.delete('ot');
-        filterButtons.forEach(b => {
-          if (b.dataset.filter === 'ot') {
-            b.classList.remove('active');
-          }
-        });
-      }
-      
       filterState.add(filter);
-      btn.classList.add('active');
     }
     
     console.log('Active filters:', Array.from(filterState));
