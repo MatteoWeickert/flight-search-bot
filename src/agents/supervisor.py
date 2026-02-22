@@ -39,49 +39,49 @@ def create_supervisor():
         temperature=0
     )
     refine_prompt = PromptTemplate.from_template("""
-    You are an expert at rephrasing follow-up questions to be standalone queries.
-    Current conversation history: {messages}
-    User's new query: {query}
-    Rewrite the user's new query to be a standalone sentence that includes all necessary context from the history.
-    Standalone query:
+        You are an expert at rephrasing follow-up questions to be standalone queries.
+        Current conversation history: {messages}
+        User's new query: {query}
+        Rewrite the user's new query to be a standalone sentence that includes all necessary context from the history.
+        Standalone query:
     """)
 
     routing_prompt = PromptTemplate.from_template("""
-    You are a routing agent in a FlightGPT system that decides which specialized agents to call.
-    
-    Available agents:
-    - qa_agent: ALWAYS called - generates text chat answer from Neo4j graph data
-    - map_agent: Visualizes geospatial data on a map (airports, routes, trajectories)
-    - table_agent: Generates HTML tables for detailed inspection
-    
-    User active filters: {filters}
-    Possible filters: 'ap' (Airports), 'tj' (Trajectories), 'ot' (Other).
-    
-    User query: {query}
-    
-    MANDATORY RULES:
-    1. ALWAYS include "qa" in your response (text answer is mandatory)
-    
-    2. ALWAYS include "map" when query involves:
-       - Flights, routes, trajectories, airports
-       - Words like "show", "display", "visualize", "map", "where"
-       - Any spatial/geographic data
-       - User has filters 'ap' or 'tj' active
-    
-    3. ALWAYS include "table" when query involves:
-       - Words like "show", "list", "display", "all", "details"
-       - Comparing multiple flights
-       - User explicitly asks for tabular format
-       - Inspection of detailed data
-    
-    4. For queries like "show flights from X", "display routes", "list departures":
-       - Include ALL THREE: ["qa", "map", "table"]
-    
-    Respond with ONLY a JSON array of agent names.
-    Examples:
-    - "Show flights from Cologne" -> ["qa", "map", "table"]
-    - "How many flights departed today?" -> ["qa"]
-    - "Visualize routes to Paris" -> ["qa", "map"]
+        You are a routing agent in a FlightGPT system that decides which specialized agents to call.
+        
+        Available agents:
+        - qa_agent: ALWAYS called - generates text chat answer from Neo4j graph data
+        - map_agent: Visualizes geospatial data on a map (airports, routes, trajectories)
+        - table_agent: Generates HTML tables for detailed inspection
+        
+        User active filters: {filters}
+        Possible filters: 'ap' (Airports), 'tj' (Trajectories), 'ot' (Other).
+        
+        User query: {query}
+        
+        MANDATORY RULES:
+        1. ALWAYS include "qa" in your response (text answer is mandatory)
+        
+        2. ALWAYS include "map" when query involves:
+        - Flights, routes, trajectories, airports
+        - Words like "show", "display", "visualize", "map", "where"
+        - Any spatial/geographic data
+        - User has filters 'ap' or 'tj' active
+        
+        3. ALWAYS include "table" when query involves:
+        - Words like "show", "list", "display", "all", "details"
+        - Comparing multiple flights
+        - User explicitly asks for tabular format
+        - Inspection of detailed data
+        
+        4. For queries like "show flights from X", "display routes", "list departures":
+        - Include ALL THREE: ["qa", "map", "table"]
+        
+        Respond with ONLY a JSON array of agent names.
+        Examples:
+        - "Show flights from Cologne" -> ["qa", "map", "table"]
+        - "How many flights departed today?" -> ["qa"]
+        - "Visualize routes to Paris" -> ["qa", "map"]
     """)
 
     reasoning_prompt = PromptTemplate.from_template("""
@@ -118,7 +118,6 @@ def create_supervisor():
         return state
 
     def route_query(state: SupervisorState) -> SupervisorState:
-
         if state.get("geojson_input"):
             state["agents_to_call"] = ["qa", "map", "table"]
             if not state["query"]:

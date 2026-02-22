@@ -109,7 +109,6 @@ def create_table_agent():
 
         raw_results = state.get("cypher_results", [])
         
-        # Simple flattening for preview
         flattened_results = []
         for row in raw_results:
             flat_row = {}
